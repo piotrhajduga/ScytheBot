@@ -1,5 +1,5 @@
 import os,sys,imp,traceback,time
-import irc
+import irc,bot
 
 CONF = os.path.expanduser('~/.scythebot/config.py')
 if __name__=="__main__":
@@ -7,23 +7,19 @@ if __name__=="__main__":
 	except:
 		traceback.print_exc()
 		sys.exit()
-	c = config
-	c.nick = "igglybuff"
-	c.name = "igglybuff IRC bot"
-	c.ident = "igglybuff"
-	bot = irc.IRC(c.nick, c.ident, c.name, c.host, c.port, c.ssl, c.password, c.encoding)
+	b = bot.Bot(config)
 	while 1:
 		try:
-			bot.connect()
-			bot.main_loop()
+			b.connect()
+			b.main_loop()
 		except KeyboardInterrupt:
-			bot.quit()
+			b.quit()
 			sys.exit()
 		except irc.ConnectionError:
-			bot.quit()
+			b.quit()
 			time.sleep(5)
-			bot = irc.IRC(c.nick, c.ident, c.name, c.host, c.port, c.ssl, c.password, c.encoding)
-			bot.connect()
+			b = bot.Bot(config)
+			b.connect()
 			continue
 		except:
 			traceback.print_exc()

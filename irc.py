@@ -44,7 +44,7 @@ class IRC(object):
 	def dispatcher_prepare(self):
 		self.patterns = dict()
 		self.patterns["cmd"] = r"^\:([^ ]+)[ ]+([^ ]+)[ ]+\:?([^ ].*)?$"
-		self.patterns["privmsg"] = r"^\:([^ ]+)[ ]+PRIVMSG[ ]+\:?([^ ].*)?$"
+		self.patterns["privmsg"] = r"^\:([^ ]+)[ ]+PRIVMSG[ ]+([^ ]+)[ ]+\:?([^ ].*)?$"
 		self.patterns["kick"] = r"^\:([^ ]+)[ ]+KICK[ ]+\:?([^ ].*)?$"
 		self.patterns["ping"] = r"^PING[ ]+\:?([^ ].*)?$"
 		for p in self.patterns:
@@ -57,12 +57,12 @@ class IRC(object):
 			cmd = m.groups()[1]
 			params = m.groups()[2]
 			self.handle_cmd(sender,cmd,params)
-			return
 		m = self.patterns["privmsg"].match(msg)
 		if m:
 			sender = m.groups()[0]
-			params = m.groups()[1]
-			self.handle_privmsg(sender,params)
+			target = m.groups()[1]
+			params = m.groups()[2]
+			self.handle_privmsg(sender,target,params)
 			return
 		m = self.patterns["kick"].match(msg)
 		if m:
@@ -113,13 +113,12 @@ class IRC(object):
 	def handle_ping(self, params):
 		self.msg("PONG :%s" % params)
 
-	def handle_privmsg(self, sender, params):
+	def handle_privmsg(self, sender, target, params):
 		pass
 
 	def handle_cmd(self, sender, cmd, params):
 		if cmd=="NOTICE" and self.connected==False:
 			self.connected = True
-			self.msg("JOIN #Lobos")
 
 	def quit(self):
 		self.msg("QUIT")
