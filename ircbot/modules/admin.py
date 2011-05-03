@@ -5,6 +5,7 @@ __module_class_names__ = [
 		"Join",
 		"Part",
 		"Nick",
+		"Send",
 		"Msg",
 		"Reload",
 		"CoreDump",
@@ -103,6 +104,18 @@ class Msg(Module):
 			return
 		bot.say(bot.match.group(1),bot.match.group(2))
 
+class Send(Module):
+	def __init__(self, bot, config):
+		Module.__init__(self, bot, config)
+		self.handler_type = "privmsg"
+		self.rule = r"\.send[ ]+([^ ].*)"
+	
+	def run(self, bot, params):
+		if bot.sender not in [x[2] for x in bot_admins]:
+			return
+		bot.msg(bot.match.groups()[0])
+
+class Reload(Module):
 class Reload(Module):
 	def __init__(self, bot, config):
 		Module.__init__(self, bot, config)
