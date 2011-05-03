@@ -116,7 +116,6 @@ class Send(Module):
 		bot.msg(bot.match.groups()[0])
 
 class Reload(Module):
-class Reload(Module):
 	def __init__(self, bot, config):
 		Module.__init__(self, bot, config)
 		self.handler_type = "privmsg"
