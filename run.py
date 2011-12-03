@@ -2,7 +2,11 @@
 import os,sys,imp,traceback,time
 import irc,bot
 
+<<<<<<< HEAD
 CONF = os.path.expanduser('~/.ircbot/config.py')
+=======
+CONF = os.path.expanduser('~/ircbot/config.py')
+>>>>>>> a18a08a889d0e64c664daa9f83b81e9e6f2afcfa
 if __name__=="__main__":
 	try: config = imp.load_source('config',CONF)
 	except:
