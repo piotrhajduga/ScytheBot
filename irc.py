@@ -1,10 +1,7 @@
 import socket, ssl, imp
 import re, traceback
 
-class Error(Exception):
-	pass
-
-class ConnectionError(Error):
+class ConnectionError(BaseException):
 	def __str__(self):
 		return "Disconnected!"
 
@@ -14,27 +11,27 @@ class IRC(object):
 		self.buffer = ""
 		self.irc = ""
 		self.dispatcher_prepare()
-		self.conf = dict()
-		self.conf["host"] = host
-		self.conf["port"] = port
-		self.conf["ssl"] = ssl
-		self.conf["nick"] = nick
-		self.conf["ident"] = ident
-		self.conf["name"] = name
-		self.conf["password"] = password
-		self.conf["encoding"] = encoding
+		self.config = dict()
+		self.config["host"] = host
+		self.config["port"] = port
+		self.config["ssl"] = ssl
+		self.config["nick"] = nick
+		self.config["ident"] = ident
+		self.config["name"] = name
+		self.config["password"] = password
+		self.config["encoding"] = encoding
 
 	def connect(self):
 		self.irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		if self.conf["ssl"]:
+		if self.config["ssl"]:
 			self.irc = ssl.wrap_socket(self.irc)
-		self.irc.connect((self.conf["host"], self.conf["port"]))
-		self.verbose_msg("Connected to %s:%s" % (self.conf["host"], self.conf["port"]))
-		if self.conf["password"]:
-			self.msg("PASS %s" % self.conf["password"])
-		self.verbose_msg("Identifying as %s (user:%s,name:%s)" % (self.conf["nick"],self.conf["ident"],self.conf["name"]))
-		self.msg("NICK %s" % self.conf["nick"])
-		self.msg("USER %s %s %s :%s" % (self.conf["ident"], self.conf["host"], self.conf["nick"], self.conf["name"]))
+		self.irc.connect((self.config["host"], self.config["port"]))
+		self.verbose_msg("Connected to %s:%s" % (self.config["host"], self.config["port"]))
+		if self.config["password"]:
+			self.msg("PASS %s" % self.config["password"])
+		self.verbose_msg("Identifying as %s (user:%s,name:%s)" % (self.config["nick"],self.config["ident"],self.config["name"]))
+		self.msg("NICK %s" % self.config["nick"])
+		self.msg("USER %s %s %s :%s" % (self.config["ident"], self.config["host"], self.config["nick"], self.config["name"]))
 		self.verbose_msg("function # returning from connect()")
 	
 	def quit(self):
@@ -81,12 +78,12 @@ class IRC(object):
 				read = self.irc.recv(512)
 				if not read:
 					raise ConnectionError()
-				self.buffer = self.buffer + read.decode(self.conf["encoding"])
-				temp = self.buffer.split("\r\n")
+				self.buffer = self.buffer + read.decode(self.config["encoding"])
+				temp = self.buffer.split("\n")
 				self.buffer = temp.pop()
 				for line in temp:
-					self.verbose_msg("read < %s" % line)
 					line = line.rstrip()
+					self.verbose_msg("read < %s" % line)
 					self.dispatch(line)
 			except KeyboardInterrupt as e:
 				raise e
@@ -102,7 +99,7 @@ class IRC(object):
 	def msg(self, msg):
 		self.verbose_msg("sending > %s" % msg)
 		msg = "%s\r\n" % msg
-		self.irc.send(msg.encode(self.conf["encoding"]))
+		self.irc.send(msg.encode(self.config["encoding"]))
 	
 	def say(self, target, msg):
 		self.msg("PRIVMSG %s :%s" % (target, msg))

@@ -1,5 +1,7 @@
 import irc
 import pkgutil,re,traceback
+from threading import Timer
+from threading2 import Thread
 
 class Wrapper(object):
 	def __init__(self, origobj):
@@ -12,12 +14,64 @@ class Wrapper(object):
 class ConfigException(BaseException):
 	pass
 
+def noop(*args,**kwargs):
+    pass
+
+def run_per_minute(max_runs_per_m, run_if_too_often):
+    def decorate(f):
+        def run(*args,**kwargs):
+            if run.__last_minute == int(time.time())/60:
+                run.__runs_last_minute += 1
+                if max_runs_per_m >= run.__runs_last_minute:
+                    return f(*args, **kwargs)
+                else:
+                    return run_if_too_often(*args,**kwargs)
+            else:
+                run.__runs_last_minute = 0
+                run.__last_minute = int(time.time())/60
+                return f(*args, **kwargs)
+        run.__last_minute = time.time()
+        run.__runs_last_minute = 0
+        return run
+    return decorate
+
+def run_in_background(timeout=None):
+    def decorate(f):
+        def run(*args, **kwargs):
+            timer = False
+            def f_and_timer(*args, **kwargs):
+                f(*args, **kwargs)
+                timer and timer.cancel()
+
+            print( 'starting bg thread with timeout %s' % timeout )
+            thread = Thread( target = f_and_timer, args=args, kwargs=kwargs )
+
+            def stop():
+                print( 'stopping thread %s' % thread )
+                thread.terminate()
+
+            if timeout != None:
+                timer = Timer(timeout, stop)
+                timer.start()
+
+            thread.start()
+            return thread
+            
+        return run
+    return decorate
+
 class Module(object):
 	rule = None
-	def __init__(self, bot, conf):
-		self.config = conf
+
+	def __init__(self, bot, config):
+		self.config = config
+		self.config["threadable"] = config.get("thredeable", False)
+		if self.config["threadable"]:
+			self.config["thread_timeout"] = config.get("thread_timeout", 5.0)
+
 	def run(self, bot, params):
 		pass
+
 	def unload(self):
 		pass
 
@@ -34,7 +88,10 @@ class Bot(irc.IRC):
 				config.password,
 				config.encoding
 				)
-		self.config = config
+		self.config["modules_paths"] = config.modules_paths
+		self.config["load_modules"] = config.load_modules
+		self.config["block_modules"] = config.block_modules
+		self.config["channels"] = config.channels
 		self.modules = dict() # { "type" : ("pack_name", "regexp", "module") }
 		self.modules["privmsg"] = list()
 		self.modules["cmd"] = list()
@@ -42,8 +99,8 @@ class Bot(irc.IRC):
 		self.load_modules()
 	
 	def load_modules(self):
-		for (importer, name, ispkg) in pkgutil.iter_modules(self.config.modules_paths):
-			if name in self.config.load_modules and name not in self.config.block_modules:
+		for (importer, name, ispkg) in pkgutil.iter_modules(self.config["modules_paths"]):
+			if name in self.config["load_modules"] and name not in self.config["block_modules"]:
 				try:
 					self.load_module_with_importer(importer, name)
 				except BaseException as e:
@@ -74,7 +131,7 @@ class Bot(irc.IRC):
 
 	def load_module(self, pack_name, load_modules=None):
 		modules = filter(lambda m: m[1] == pack_name,
-				pkgutil.iter_modules(self.config.modules_paths))
+				pkgutil.iter_modules(self.config["modules_paths"]))
 		for (importer, name, ispkg) in modules:
 			try:
 				self.load_module_with_importer(importer, name, load_modules=load_modules)
@@ -134,7 +191,10 @@ class Bot(irc.IRC):
 				obj.target = target
 				obj.line = msg
 				obj.match = match
-				m[2].run(obj,(sender,msg))
+				if m[2].config['threadable']:
+					run_in_background( m[2].config['thread_timeout'] )(m[2].run)( obj, (sender,msg))
+				else:
+					m[2].run( obj, (sender,msg))
 			except BaseException as e:
 				self.verbose_msg("error ! something went wrong")
 				traceback.print_exc()
