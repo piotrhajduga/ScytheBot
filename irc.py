@@ -1,4 +1,4 @@
-import socket, ssl, imp
+import socket, ssl
 import re, traceback
 
 class ConnectionError(BaseException):
@@ -6,7 +6,8 @@ class ConnectionError(BaseException):
         return "Disconnected!"
 
 class IRC(object):
-    def __init__(self, nick, ident, name, host, port=6667, ssl=False, password=None, encoding="utf-8"):
+    def __init__(self, nick, ident, name, host, port=6667, \
+            use_ssl=False, password=None, encoding="utf-8"):
         self.connected = False
         self.buffer = ""
         self.irc = ""
@@ -14,61 +15,63 @@ class IRC(object):
         self.config = dict()
         self.config["host"] = host
         self.config["port"] = port
-        self.config["ssl"] = ssl
+        self.config["ssl"] = use_ssl
         self.config["nick"] = nick
         self.config["ident"] = ident
         self.config["name"] = name
         self.config["password"] = password
         self.config["encoding"] = encoding
+        self.patterns = dict()
 
     def connect(self):
         self.irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         if self.config["ssl"]:
             self.irc = ssl.wrap_socket(self.irc)
         self.irc.connect((self.config["host"], self.config["port"]))
-        self.verbose_msg("Connected to %s:%s" % (self.config["host"], self.config["port"]))
+        self.verbose_msg("Connected to %s:%s" % (self.config["host"], \
+                self.config["port"]))
         if self.config["password"]:
             self.msg("PASS %s" % self.config["password"])
-        self.verbose_msg("Identifying as %s (user:%s,name:%s)" % (self.config["nick"],self.config["ident"],self.config["name"]))
+        self.verbose_msg("Identifying as %s (user:%s,name:%s)" \
+                % (self.config["nick"], self.config["ident"], \
+                   self.config["name"]))
         self.msg("NICK %s" % self.config["nick"])
-        self.msg("USER %s %s %s :%s" % (self.config["ident"], self.config["host"], self.config["nick"], self.config["name"]))
+        self.msg("USER %s %s %s :%s" % (self.config["ident"], \
+                self.config["host"], self.config["nick"], self.config["name"]))
         self.verbose_msg("function # returning from connect()")
     
-    def quit(self):
-        self.irc.msg("QUIT")
-        self.irc.close()
 
     def dispatcher_prepare(self):
-        self.patterns = dict()
         self.patterns["cmd"] = r"^\:([^ ]+)[ ]+([^ ]+)[ ]+\:?([^ ].*)?$"
-        self.patterns["privmsg"] = r"^\:([^ ]+)[ ]+PRIVMSG[ ]+([^ ]+)[ ]+\:?([^ ].*)?$"
+        self.patterns["privmsg"] = \
+                r"^\:([^ ]+)[ ]+PRIVMSG[ ]+([^ ]+)[ ]+\:?([^ ].*)?$"
         self.patterns["kick"] = r"^\:([^ ]+)[ ]+KICK[ ]+\:?([^ ].*)?$"
         self.patterns["ping"] = r"^PING[ ]+\:?([^ ].*)?$"
-        for p in self.patterns:
-            self.patterns[p] = re.compile(self.patterns[p])
+        for ptrn in self.patterns:
+            self.patterns[ptrn] = re.compile(self.patterns[ptrn])
 
     def dispatch(self, msg):
-        m = self.patterns["cmd"].match(msg)
-        if m:
-            sender = m.groups()[0]
-            cmd = m.groups()[1]
-            params = m.groups()[2]
-            self.handle_cmd(sender,cmd,params)
-        m = self.patterns["privmsg"].match(msg)
-        if m:
-            sender = m.groups()[0]
-            target = m.groups()[1]
-            params = m.groups()[2]
-            self.handle_privmsg(sender,target,params)
+        match = self.patterns["cmd"].match(msg)
+        if match:
+            sender = match.groups()[0]
+            cmd = match.groups()[1]
+            params = match.groups()[2]
+            self.handle_cmd(sender, cmd, params)
+        match = self.patterns["privmsg"].match(msg)
+        if match:
+            sender = match.groups()[0]
+            target = match.groups()[1]
+            params = match.groups()[2]
+            self.handle_privmsg(sender, target, params)
             return
-        m = self.patterns["kick"].match(msg)
-        if m:
-            params = m.groups()[1]
+        match = self.patterns["kick"].match(msg)
+        if match:
+            params = match.groups()[1]
             self.handle_kick(params)
             return
-        m = self.patterns["ping"].match(msg)
-        if m:
-            params = m.groups()[0]
+        match = self.patterns["ping"].match(msg)
+        if match:
+            params = match.groups()[0]
             self.handle_ping(params)
             return
     
@@ -85,10 +88,10 @@ class IRC(object):
                     line = line.rstrip()
                     self.verbose_msg("read < %s" % line)
                     self.dispatch(line)
-            except KeyboardInterrupt as e:
-                raise e
-            except ConnectionError as e:
-                raise e
+            except KeyboardInterrupt as exc:
+                raise exc
+            except ConnectionError as exc:
+                raise exc
             except:
                 self.msg("error ! unhandled exception")
                 traceback.print_exc()
@@ -114,9 +117,12 @@ class IRC(object):
         pass
 
     def handle_cmd(self, sender, cmd, params):
-        if cmd=="NOTICE" and self.connected==False:
+        if cmd == "NOTICE" and not self.connected:
             self.connected = True
 
     def quit(self):
         self.msg("QUIT")
-        self.irc.close()
+        self.close()
+
+    def close():
+        pass
