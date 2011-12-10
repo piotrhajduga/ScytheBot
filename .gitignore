@@ -9,3 +9,5 @@ ircbot/modules/parrot.py~
 ircbot/modules/ping.py~
 py3.2/
 run.py~
+.gitignore~
+README~
