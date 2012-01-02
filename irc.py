@@ -124,5 +124,5 @@ class IRC(object):
         self.msg("QUIT")
         self.close()
 
-    def close():
+    def close(self):
         pass
