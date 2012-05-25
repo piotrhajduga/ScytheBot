@@ -1,16 +1,27 @@
-import socket, ssl
-import re, traceback
+import logging
+import socket
+import ssl
+import re
+import traceback
 
-class ConnectionError(BaseException):
+logger = logging.getLogger(__name__)
+
+
+class LostConnectionException(BaseException):
     def __str__(self):
         return "Disconnected!"
+
+
+class ConnectionFailureException(Exception):
+    pass
+
 
 class IRC(object):
     def __init__(self, nick, ident, name, host, port=6667, \
             use_ssl=False, password=None, encoding="utf-8"):
         self.connected = False
         self.buffer = ""
-        self.irc = ""
+        self.irc = None
         self.config = dict()
         self.config["host"] = host
         self.config["port"] = port
@@ -24,22 +35,21 @@ class IRC(object):
         self.dispatcher_prepare()
 
     def connect(self):
-        self.irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        if self.config["ssl"]:
-            self.irc = ssl.wrap_socket(self.irc)
-        self.irc.connect((self.config["host"], self.config["port"]))
-        self.verbose_msg("Connected to %s:%s" % (self.config["host"], \
-                self.config["port"]))
-        if self.config["password"]:
-            self.msg("PASS %s" % self.config["password"])
-        self.verbose_msg("Identifying as %s (user:%s,name:%s)" \
-                % (self.config["nick"], self.config["ident"], \
-                   self.config["name"]))
-        self.msg("NICK %s" % self.config["nick"])
-        self.msg("USER %s %s %s :%s" % (self.config["ident"], \
-                self.config["host"], self.config["nick"], self.config["name"]))
-        self.verbose_msg("function # returning from connect()")
-    
+        try:
+            self.irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            if self.config["ssl"]:
+                self.irc = ssl.wrap_socket(self.irc)
+            self.irc.connect((self.config["host"], self.config["port"]))
+            logger.info("Connected to %s:%s", self.config["host"], self.config["port"])
+            if self.config["password"]:
+                self.msg("PASS %s" % self.config["password"])
+            logger.info("Identifying as %s (user:%s,name:%s)", self.config["nick"], self.config["ident"], self.config["name"])
+            self.msg("NICK %s" % self.config["nick"])
+            self.msg("USER %s %s %s :%s" % (self.config["ident"], \
+                    self.config["host"], self.config["nick"], self.config["name"]))
+        except socket.error as err:
+            logger.exception('Error connecting to the socket')
+            raise ConnectionFailureException()
 
     def dispatcher_prepare(self):
         self.patterns["cmd"] = r"^\:([^ ]+)[ ]+([^ ]+)[ ]+\:?([^ ].*)?$"
@@ -74,39 +84,36 @@ class IRC(object):
             params = match.groups()[0]
             self.handle_ping(params)
             return
-    
+
     def main_loop(self):
         while 1:
             try:
                 read = self.irc.recv(512)
                 if not read:
-                    raise ConnectionError()
+                    raise LostConnectionException()
                 self.buffer = self.buffer + read.decode(self.config["encoding"])
                 temp = self.buffer.split("\n")
                 self.buffer = temp.pop()
                 for line in temp:
                     line = line.rstrip()
-                    self.verbose_msg("read < %s" % line)
+                    logger.info("read < %s" % line)
                     self.dispatch(line)
             except KeyboardInterrupt as exc:
                 raise exc
-            except ConnectionError as exc:
+            except LostConnectionException as exc:
                 raise exc
             except:
                 self.msg("error ! unhandled exception")
                 traceback.print_exc()
-    
-    def verbose_msg(self, msg):
-        print("<> %s" % msg)
-    
+
     def msg(self, msg):
-        self.verbose_msg("sending > %s" % msg)
+        logger.info("sending > %s" % msg)
         msg = "%s\r\n" % msg
         self.irc.send(msg.encode(self.config["encoding"]))
-    
+
     def say(self, target, msg):
         self.msg("PRIVMSG %s :%s" % (target, msg))
-    
+
     def handle_kick(self, params):
         pass
 
