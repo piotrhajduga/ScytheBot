@@ -21,7 +21,7 @@ class IRC(object):
             use_ssl=False, password=None, encoding="utf-8"):
         self.connected = False
         self.buffer = ""
-        self.irc = ""
+        self.irc = None
         self.config = dict()
         self.config["host"] = host
         self.config["port"] = port

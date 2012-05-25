@@ -15,6 +15,9 @@ CONF = os.path.expanduser('~/.ircbot/config.py')
 if __name__ == '__main__':
     try:
         config = imp.load_source('config', CONF)
+        logging.basicConfig(filename=config.log_file, \
+                level=getattr(logging, config.log_level.upper()), \
+                format=config.log_format)
     except:
         traceback.print_exc()
         sys.exit()
@@ -27,6 +30,7 @@ if __name__ == '__main__':
             ircbot.quit()
             sys.exit()
         except irc.LostConnectionException as exc:
+            logger.error('Lost connection with the irc network')
             ircbot.close()
             time.sleep(5)
             continue
