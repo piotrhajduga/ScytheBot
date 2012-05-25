@@ -1,11 +1,4 @@
 __pycache__/
-bot.py~
-irc.py~
-ircbot/config.py~
-ircbot/modules/admin.py~
-ircbot/modules/dice.py~
-ircbot/modules/jiggly.py~
-ircbot/modules/parrot.py~
-ircbot/modules/ping.py~
 py3.2/
-run.py~
+*~
+*.pyc

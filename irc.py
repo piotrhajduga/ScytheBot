@@ -11,7 +11,6 @@ class IRC(object):
         self.connected = False
         self.buffer = ""
         self.irc = ""
-        self.dispatcher_prepare()
         self.config = dict()
         self.config["host"] = host
         self.config["port"] = port
@@ -22,6 +21,7 @@ class IRC(object):
         self.config["password"] = password
         self.config["encoding"] = encoding
         self.patterns = dict()
+        self.dispatcher_prepare()
 
     def connect(self):
         self.irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -124,5 +124,5 @@ class IRC(object):
         self.msg("QUIT")
         self.close()
 
-    def close():
+    def close(self):
         pass
