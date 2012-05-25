@@ -1,9 +1,16 @@
-import socket, ssl
-import re, traceback
+import logging
+import socket
+import ssl
+import re
+import traceback
+
+logger = logging.getLogger(__name__)
+
 
 class ConnectionError(BaseException):
     def __str__(self):
         return "Disconnected!"
+
 
 class IRC(object):
     def __init__(self, nick, ident, name, host, port=6667, \
@@ -28,18 +35,14 @@ class IRC(object):
         if self.config["ssl"]:
             self.irc = ssl.wrap_socket(self.irc)
         self.irc.connect((self.config["host"], self.config["port"]))
-        self.verbose_msg("Connected to %s:%s" % (self.config["host"], \
-                self.config["port"]))
+        logger.info("Connected to %s:%s", self.config["host"], self.config["port"])
         if self.config["password"]:
             self.msg("PASS %s" % self.config["password"])
-        self.verbose_msg("Identifying as %s (user:%s,name:%s)" \
-                % (self.config["nick"], self.config["ident"], \
-                   self.config["name"]))
+        logger.info("Identifying as %s (user:%s,name:%s)", self.config["nick"], self.config["ident"], self.config["name"])
         self.msg("NICK %s" % self.config["nick"])
         self.msg("USER %s %s %s :%s" % (self.config["ident"], \
                 self.config["host"], self.config["nick"], self.config["name"]))
-        self.verbose_msg("function # returning from connect()")
-    
+        logger.debug("function # returning from connect()")
 
     def dispatcher_prepare(self):
         self.patterns["cmd"] = r"^\:([^ ]+)[ ]+([^ ]+)[ ]+\:?([^ ].*)?$"
@@ -74,7 +77,7 @@ class IRC(object):
             params = match.groups()[0]
             self.handle_ping(params)
             return
-    
+
     def main_loop(self):
         while 1:
             try:
@@ -86,7 +89,7 @@ class IRC(object):
                 self.buffer = temp.pop()
                 for line in temp:
                     line = line.rstrip()
-                    self.verbose_msg("read < %s" % line)
+                    logger.info("read < %s" % line)
                     self.dispatch(line)
             except KeyboardInterrupt as exc:
                 raise exc
@@ -95,18 +98,15 @@ class IRC(object):
             except:
                 self.msg("error ! unhandled exception")
                 traceback.print_exc()
-    
-    def verbose_msg(self, msg):
-        print("<> %s" % msg)
-    
+
     def msg(self, msg):
-        self.verbose_msg("sending > %s" % msg)
+        logger.info("sending > %s" % msg)
         msg = "%s\r\n" % msg
         self.irc.send(msg.encode(self.config["encoding"]))
-    
+
     def say(self, target, msg):
         self.msg("PRIVMSG %s :%s" % (target, msg))
-    
+
     def handle_kick(self, params):
         pass
 
