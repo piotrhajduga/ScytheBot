@@ -7,9 +7,13 @@ import traceback
 logger = logging.getLogger(__name__)
 
 
-class ConnectionError(BaseException):
+class LostConnectionException(BaseException):
     def __str__(self):
         return "Disconnected!"
+
+
+class ConnectionFailureException(Exception):
+    pass
 
 
 class IRC(object):
@@ -31,18 +35,21 @@ class IRC(object):
         self.dispatcher_prepare()
 
     def connect(self):
-        self.irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        if self.config["ssl"]:
-            self.irc = ssl.wrap_socket(self.irc)
-        self.irc.connect((self.config["host"], self.config["port"]))
-        logger.info("Connected to %s:%s", self.config["host"], self.config["port"])
-        if self.config["password"]:
-            self.msg("PASS %s" % self.config["password"])
-        logger.info("Identifying as %s (user:%s,name:%s)", self.config["nick"], self.config["ident"], self.config["name"])
-        self.msg("NICK %s" % self.config["nick"])
-        self.msg("USER %s %s %s :%s" % (self.config["ident"], \
-                self.config["host"], self.config["nick"], self.config["name"]))
-        logger.debug("function # returning from connect()")
+        try:
+            self.irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            if self.config["ssl"]:
+                self.irc = ssl.wrap_socket(self.irc)
+            self.irc.connect((self.config["host"], self.config["port"]))
+            logger.info("Connected to %s:%s", self.config["host"], self.config["port"])
+            if self.config["password"]:
+                self.msg("PASS %s" % self.config["password"])
+            logger.info("Identifying as %s (user:%s,name:%s)", self.config["nick"], self.config["ident"], self.config["name"])
+            self.msg("NICK %s" % self.config["nick"])
+            self.msg("USER %s %s %s :%s" % (self.config["ident"], \
+                    self.config["host"], self.config["nick"], self.config["name"]))
+        except socket.error as err:
+            logger.exception('Error connecting to the socket')
+            raise ConnectionFailureException()
 
     def dispatcher_prepare(self):
         self.patterns["cmd"] = r"^\:([^ ]+)[ ]+([^ ]+)[ ]+\:?([^ ].*)?$"
@@ -83,7 +90,7 @@ class IRC(object):
             try:
                 read = self.irc.recv(512)
                 if not read:
-                    raise ConnectionError()
+                    raise LostConnectionException()
                 self.buffer = self.buffer + read.decode(self.config["encoding"])
                 temp = self.buffer.split("\n")
                 self.buffer = temp.pop()
@@ -93,7 +100,7 @@ class IRC(object):
                     self.dispatch(line)
             except KeyboardInterrupt as exc:
                 raise exc
-            except ConnectionError as exc:
+            except LostConnectionException as exc:
                 raise exc
             except:
                 self.msg("error ! unhandled exception")

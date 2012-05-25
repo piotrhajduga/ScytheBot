@@ -19,18 +19,21 @@ if __name__ == '__main__':
         traceback.print_exc()
         sys.exit()
     while 1:
-        b = bot.Bot(config)
+        ircbot = bot.Bot(config)
         try:
-            b.connect()
-            b.main_loop()
-        except KeyboardInterrupt as e:
-            b.quit()
+            ircbot.connect()
+            ircbot.main_loop()
+        except KeyboardInterrupt as exc:
+            ircbot.quit()
             sys.exit()
-        except irc.ConnectionError as e:
-            b.quit()
+        except irc.LostConnectionException as exc:
+            ircbot.close()
             time.sleep(5)
             continue
-        except:
+        except irc.ConnectionFailureException as exc:
+            logger.error('Cannot connect to the irc network')
+            sys.exit()
+        except BaseException as exc:
             traceback.print_exc()
-            b.quit()
+            ircbot.close()
             sys.exit()
