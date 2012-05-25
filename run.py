@@ -17,7 +17,7 @@ if __name__ == '__main__':
         config = imp.load_source('config', CONF)
         logging.basicConfig(filename=config.log_file, \
                 level=getattr(logging, config.log_level.upper()), \
-                format=config.log_format)
+                format=config.log_format, datefmt=config.log_datefmt)
     except:
         traceback.print_exc()
         sys.exit()
