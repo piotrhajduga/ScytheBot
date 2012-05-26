@@ -16,23 +16,34 @@ class ConnectionFailureException(Exception):
     pass
 
 
+class BadConfigurationException(Exception):
+    pass
+
+
 class IRC(object):
-    def __init__(self, nick, ident, name, host, port=6667, \
-            use_ssl=False, password=None, encoding="utf-8"):
+    def __init__(self, config):
         self.connected = False
         self.buffer = ""
         self.irc = None
-        self.config = dict()
-        self.config["host"] = host
-        self.config["port"] = port
-        self.config["ssl"] = use_ssl
-        self.config["nick"] = nick
-        self.config["ident"] = ident
-        self.config["name"] = name
-        self.config["password"] = password
-        self.config["encoding"] = encoding
+        self.config = None
+        self.set_config(config)
         self.patterns = dict()
         self.dispatcher_prepare()
+
+    def set_config(self, config):
+        self.config = dict()
+        try:
+            self.config["host"] = config.host
+            self.config["port"] = config.port or 6667
+            self.config["ssl"] = config.ssl
+            self.config["nick"] = config.nick
+            self.config["ident"] = config.ident
+            self.config["name"] = config.name
+            self.config["password"] = config.password
+            self.config["encoding"] = config.encoding or "utf-8"
+        except Exception as exc:
+            logger.error('Bad configuration')
+            raise BadConfigurationException()
 
     def connect(self):
         try:
