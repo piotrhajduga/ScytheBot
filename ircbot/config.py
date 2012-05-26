@@ -29,3 +29,4 @@ block_modules = []
 log_level = 'INFO'
 log_file = None
 log_format = '%(asctime)s - %(levelname)s - %(message)s'
+log_datefmt = '%H:%M:%S'
