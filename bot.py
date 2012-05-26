@@ -93,17 +93,7 @@ class Module(object):
 
 class Bot(irc.IRC):
     def __init__(self, config):
-        irc.IRC.__init__(
-                self,
-                config.nick,
-                config.ident,
-                config.name,
-                config.host,
-                config.port,
-                config.ssl,
-                config.password,
-                config.encoding
-                )
+        irc.IRC.__init__(self, config)
         self.config["modules_paths"] = config.modules_paths
         self.config["load_modules"] = config.load_modules
         self.config["block_modules"] = config.block_modules
