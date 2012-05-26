@@ -23,7 +23,7 @@ class BadConfigurationException(Exception):
 class IRC(object):
     def __init__(self, config):
         self.connected = False
-        self.buffer = ""
+        self.buffer = str()
         self.irc = None
         self.config = None
         self.set_config(config)
@@ -54,7 +54,8 @@ class IRC(object):
             logger.info("Connected to %s:%s", self.config["host"], self.config["port"])
             if self.config["password"]:
                 self.msg("PASS %s" % self.config["password"])
-            logger.info("Identifying as %s (user:%s,name:%s)", self.config["nick"], self.config["ident"], self.config["name"])
+            logger.info("Identifying as %s (user:%s,name:%s)", \
+                    self.config["nick"], self.config["ident"], self.config["name"])
             self.msg("NICK %s" % self.config["nick"])
             self.msg("USER %s %s %s :%s" % (self.config["ident"], \
                     self.config["host"], self.config["nick"], self.config["name"]))
@@ -64,8 +65,7 @@ class IRC(object):
 
     def dispatcher_prepare(self):
         self.patterns["cmd"] = r"^\:([^ ]+)[ ]+([^ ]+)[ ]+\:?([^ ].*)?$"
-        self.patterns["privmsg"] = \
-                r"^\:([^ ]+)[ ]+PRIVMSG[ ]+([^ ]+)[ ]+\:?([^ ].*)?$"
+        self.patterns["privmsg"] = r"^\:([^ ]+)[ ]+PRIVMSG[ ]+([^ ]+)[ ]+\:?([^ ].*)?$"
         self.patterns["kick"] = r"^\:([^ ]+)[ ]+KICK[ ]+\:?([^ ].*)?$"
         self.patterns["ping"] = r"^PING[ ]+\:?([^ ].*)?$"
         for ptrn in self.patterns:
@@ -98,24 +98,16 @@ class IRC(object):
 
     def main_loop(self):
         while 1:
-            try:
-                read = self.irc.recv(512)
-                if not read:
-                    raise LostConnectionException()
-                self.buffer = self.buffer + read.decode(self.config["encoding"])
-                temp = self.buffer.split("\n")
-                self.buffer = temp.pop()
-                for line in temp:
-                    line = line.rstrip()
-                    logger.info("read < %s" % line)
-                    self.dispatch(line)
-            except KeyboardInterrupt as exc:
-                raise exc
-            except LostConnectionException as exc:
-                raise exc
-            except:
-                self.msg("error ! unhandled exception")
-                traceback.print_exc()
+            read = self.irc.recv(512)
+            if not read:
+                raise LostConnectionException()
+            self.buffer = self.buffer + read.decode(self.config["encoding"])
+            temp = self.buffer.split("\n")
+            self.buffer = temp.pop()
+            for line in temp:
+                line = line.rstrip()
+                logger.info("read < %s" % line)
+                self.dispatch(line)
 
     def msg(self, msg):
         logger.info("sending > %s" % msg)
