@@ -2,7 +2,6 @@ import logging
 import socket
 import ssl
 import re
-import traceback
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +40,7 @@ class IRC(object):
             self.config["name"] = config.name
             self.config["password"] = config.password
             self.config["encoding"] = config.encoding or "utf-8"
-        except Exception as exc:
+        except Exception:
             logger.error('Bad configuration')
             raise BadConfigurationException()
 
@@ -59,7 +58,7 @@ class IRC(object):
             self.msg("NICK %s" % self.config["nick"])
             self.msg("USER %s %s %s :%s" % (self.config["ident"], \
                     self.config["host"], self.config["nick"], self.config["name"]))
-        except socket.error as err:
+        except socket.error:
             logger.exception('Error connecting to the socket')
             raise ConnectionFailureException()
 
