@@ -97,16 +97,19 @@ class IRC(object):
 
     def main_loop(self):
         while 1:
-            read = self.irc.recv(512)
-            if not read:
-                raise LostConnectionException()
-            self.buffer = self.buffer + read.decode(self.config["encoding"])
-            temp = self.buffer.split("\n")
-            self.buffer = temp.pop()
-            for line in temp:
-                line = line.rstrip()
-                logger.info("read < %s" % line)
-                self.dispatch(line)
+            try:
+                read = self.irc.recv(512)
+                if not read:
+                    raise LostConnectionException()
+                self.buffer = self.buffer + read.decode(self.config["encoding"])
+                temp = self.buffer.split("\n")
+                self.buffer = temp.pop()
+                for line in temp:
+                    line = line.rstrip()
+                    logger.info("read < %s" % line)
+                    self.dispatch(line)
+            except UnicodeDecodeError:
+                logger.warn('Cannot decode incoming string')
 
     def msg(self, msg):
         logger.info("sending > %s" % msg)
