@@ -2,11 +2,14 @@
 __module_class_names__ = ["RememberSaying", "SaySaying","RememberYT","SayYT","Dump"]
 
 from bot import Module
+from admin import is_authorised
 import pickle, re, os.path
 import random
 import traceback
+import logging
 
-FNAME_A = os.path.expanduser('~/.ircbot/modulefiles/bot_admins.pickle')
+logger = logging.getLogger(__name__)
+
 FNAME_S = os.path.expanduser('~/.ircbot/modulefiles/parrot_sayings.pickle')
 FNAME_Y = os.path.expanduser('~/.ircbot/modulefiles/parrot_yt_links.pickle')
 CHANCES = (6,2,10) # (remember,say,thank)
@@ -18,7 +21,6 @@ CHOICES = (
         )
 sayings = list()
 yt_links = list()
-bot_admins = list() # ("nick", md5("password"), "nick!username@host")
 
 class RememberSaying(Module):
     def __init__(self, bot, config):
@@ -30,7 +32,7 @@ class RememberSaying(Module):
         global sayings 
         try:
             sayings = pickle.Unpickler(open(FNAME_S,'rb')).load()
-        except:
+        except IOError:
             sayings = list()
             pickle.Pickler(open(FNAME_S,'wb')).dump(sayings)
 
@@ -62,7 +64,7 @@ class SaySaying(Module):
         global sayings
         try:
             sayings = pickle.Unpickler(open(FNAME_S,'rb')).load()
-        except EOFError:
+        except IOError:
             sayings = list()
             pickle.Pickler(open(FNAME_S,'wb')).dump(sayings)
 
@@ -84,7 +86,7 @@ class RememberYT(Module):
         global yt_links
         try:
             yt_links = pickle.Unpickler(open(FNAME_Y,'rb')).load()
-        except EOFError:
+        except IOError:
             yt_links = list()
             pickle.Pickler(open(FNAME_Y,'wb')).dump(yt_links)
 
@@ -130,19 +132,17 @@ class Dump(Module):
         self.config["thread_timeout"] = 1.0
         self.handler_type = "privmsg"
         self.rule = r'\.dump'
-        global bot_admins
-        bot_admins = pickle.Unpickler(open(FNAME_A,'rb')).load()
     
     def run(self, bot, params):
         global bot_admins
-        if bot.sender not in [x[2] for x in bot_admins]:
-            bot.verbose_msg("error ! not authorized")
+        if not is_authorised(bot.sender):
+            logger.warn("Unauthorized attempt to dump the database")
             return
         global sayings
         global yt_links
-        bot.verbose_msg("yt_links:")
+        logger.info("yt_links:")
         for x in yt_links:
-            bot.verbose_msg("\t%s" % x)
-        bot.verbose_msg("sayings:")
+            logger.info("%s", x)
+        logger.info("sayings:")
         for x in sayings:
-            bot.verbose_msg("\t%s" % x)
+            logger.info("%s", x)

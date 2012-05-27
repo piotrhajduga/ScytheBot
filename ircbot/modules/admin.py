@@ -12,11 +12,22 @@ __module_class_names__ = [
         ]
 
 from bot import Module
-import traceback,os.path
-import pickle,hashlib
+import traceback
+import os.path
+import sqlite3
+import hashlib
+import logging
 
-FNAME_A = os.path.expanduser('~/.ircbot/modulefiles/bot_admins.pickle')
-bot_admins = list() # ("nick", md5("password"), "nick!username@host")
+logger = logging.getLogger(__name__)
+
+DB_FILE = os.path.expanduser('~/.ircbot/modulefiles/admins.db')
+
+def is_authorised(sender):
+    with sqlite3.connect(DB_FILE) as db:
+        query = 'SELECT * FROM admins WHERE sender=?'
+        db.cursor().execute(query, sender)
+        rowcount = db.cursor().rowcount
+    return rowcount
 
 class Autojoin(Module):
     def __init__(self, bot, config):
@@ -34,28 +45,31 @@ class Auth(Module):
         Module.__init__(self, bot, config)
         self.handler_type = "privmsg"
         self.rule = r"^\.auth[ ]+([^ ]+)[ ]+([^ ]+)$"
-        global bot_admins
-        try:
-            bot_admins = pickle.Unpickler(open(FNAME_A,'rb')).load()
-        except EOFError:
-            bot.verbose_msg("error ! cannot load administrators data")
+        self.create_tables()
+
+    def create_tables(self):
+        with sqlite3.connect(DB_FILE) as db:
+            query = '''CREATE TABLE IF NOT EXISTS admins
+                (id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL,
+                 nick TEXT NOT NULL,
+                 sender TEXT,
+                 pass TEXT NOT NULL)'''
+            db.cursor().execute(query)
     
     def run(self, bot, params):
-        global bot_admins
-        if bot.sender in [x[2] for x in bot_admins]:
-            bot.say(bot.sender.split("!")[0],"You already are authorized.")
-            return
-        username = bot.match.groups()[0]
-        password = bot.match.groups()[1].encode(bot.config["encoding"])
-        password = hashlib.md5(password).hexdigest()
-        for x in bot_admins:
-            print("%s,%s == %s,%s" % (username,password,x[0],x[1]))
-            if (username,password) == (x[0],x[1]):
-                x[2] = bot.sender
-                bot.say(bot.sender.split("!")[0],"Succesfully authorized.")
-                pickle.Pickler(open(FNAME_A,'wb')).dump(bot_admins)
+        with sqlite3.connect(DB_FILE) as db:
+            if is_authorised(bot.sender):
+                bot.say(bot.sender.split("!")[0],"You already are authorized.")
                 return
-            bot.say(bot.sender.split("!")[0],"Unable to authorize.")
+            username = bot.match.groups()[0]
+            password = bot.match.groups()[1].encode(bot.config["encoding"])
+            password = hashlib.md5(password).hexdigest()
+            query = 'UPDATE admins SET sender=? WHERE nick=? AND pass=?'
+            db.cursor().execute(query, bot.sender, username, password)
+            if db.cursor().rowcount:
+                bot.say(bot.sender.split("!")[0],"Succesfully authorized.")
+            else:
+                bot.say(bot.sender.split("!")[0],"Unable to authorize.")
 
 class Join(Module):
     def __init__(self, bot, config):
@@ -64,7 +78,7 @@ class Join(Module):
         self.rule = r"\.join (\#[^ ]+)"
     
     def run(self, bot, params):
-        if bot.sender not in [x[2] for x in bot_admins]:
+        if not is_authorised(bot.sender):
             return
         bot.msg("JOIN %s" % bot.match.groups()[0])
         bot.say(bot.match.groups()[0], "Hello!")
@@ -77,7 +91,7 @@ class Part(Module):
         self.rule = r"\.part (\#[^ ]+)"
     
     def run(self, bot, params):
-        if bot.sender not in [x[2] for x in bot_admins]:
+        if not is_authorised(bot.sender):
             return
         bot.msg("PART %s" % bot.match.groups(0))
 
@@ -88,7 +102,7 @@ class Nick(Module):
         self.rule = r"\.nick ([^ ]+)"
     
     def run(self, bot, params):
-        if bot.sender not in [x[2] for x in bot_admins]:
+        if not is_authorised(bot.sender):
             return
         bot.conf.nick = bot.match.group(0)
         bot.msg("NICK %s" % bot.match.groups(0))
@@ -100,9 +114,9 @@ class Msg(Module):
         self.rule = r"\.msg (\#[^ ]+)[ ]+([^ ].*)"
     
     def run(self, bot, params):
-        if bot.sender not in [x[2] for x in bot_admins]:
+        if not is_authorised(bot.sender):
             return
-        bot.say(bot.match.group(1),bot.match.group(2))
+        bot.say(bot.match.group(1), bot.match.group(2))
 
 class Send(Module):
     def __init__(self, bot, config):
@@ -111,7 +125,7 @@ class Send(Module):
         self.rule = r"\.send[ ]+([^ ].*)"
     
     def run(self, bot, params):
-        if bot.sender not in [x[2] for x in bot_admins]:
+        if not is_authorised(bot.sender):
             return
         bot.msg(bot.match.groups()[0])
 
@@ -122,7 +136,7 @@ class Reload(Module):
         self.rule = r"^\.(reload|unload)[ ]+([^ ]+)$"
     
     def run(self, bot, params):
-        if bot.sender not in [x[2] for x in bot_admins]:
+        if not is_authorised(bot.sender):
             return
         mn = bot.match.groups()[1]
         nick = params[0].split("!")[0]
@@ -150,7 +164,7 @@ class CoreDump(Module):
         self.rule = r"^\.core_dump$"
     
     def run(self, bot, params):
-        if bot.sender not in [x[2] for x in bot_admins]:
+        if not is_authorised(bot.sender):
             return
         #bot.say(bot.sender.split("!")[0],"yeah!")
         for k in bot.modules:
