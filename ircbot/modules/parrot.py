@@ -5,7 +5,6 @@ from bot import Module
 from admin import is_authorised
 import pickle, re, os.path
 import random
-import traceback
 import logging
 
 logger = logging.getLogger(__name__)
@@ -134,7 +133,6 @@ class Dump(Module):
         self.rule = r'\.dump'
     
     def run(self, bot, params):
-        global bot_admins
         if not is_authorised(bot.sender):
             logger.warn("Unauthorized attempt to dump the database")
             return
