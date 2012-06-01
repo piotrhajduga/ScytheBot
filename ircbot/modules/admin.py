@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 __module_class_names__ = [
         "Auth",
+        "Deauth",
         "Autojoin",
         "Join",
         "Part",
