@@ -84,7 +84,7 @@ class Deauth(Module):
                 bot.say(bot.sender.split("!")[0],"You are not authorized.")
                 return
             query = 'UPDATE admins SET sender="" WHERE sender=?'
-            db.cursor().execute(query, bot.sender)
+            db.cursor().execute(query, (bot.sender,))
             if db.cursor().rowcount:
                 bot.say(bot.sender.split("!")[0],"Succesfully deauthorized.")
             else:
