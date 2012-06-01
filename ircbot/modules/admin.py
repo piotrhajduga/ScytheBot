@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 __module_class_names__ = [
         "Auth",
+        "Deauth",
         "Autojoin",
         "Join",
         "Part",
@@ -69,6 +70,24 @@ class Auth(Module):
             bot.say(bot.sender.split("!")[0],"Succesfully authorized.")
         else:
             bot.say(bot.sender.split("!")[0],"Unable to authorize.")
+
+class Deauth(Module):
+    def __init__(self, bot, config):
+        Module.__init__(self, bot, config)
+        self.handler_type = "privmsg"
+        self.rule = r"^\.deauth$"
+
+    def run(self, bot, params):
+        with sqlite3.connect(DB_FILE) as db:
+            if not is_authorised(bot.sender):
+                bot.say(bot.sender.split("!")[0],"You are not authorized.")
+                return
+            query = 'UPDATE admins SET sender="" WHERE sender=?'
+            db.cursor().execute(query, (bot.sender,))
+            if db.cursor().rowcount:
+                bot.say(bot.sender.split("!")[0],"Succesfully deauthorized.")
+            else:
+                bot.say(bot.sender.split("!")[0],"Unable to deauthorize.")
 
 class Join(Module):
     def __init__(self, bot, config):
