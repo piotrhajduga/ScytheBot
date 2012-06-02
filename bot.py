@@ -104,18 +104,25 @@ class Bot(irc.IRC):
         self.load_modules()
 
     def load_modules(self):
+        logger.debug('Loading modules:\n%s',
+                '\n'.join(pkgutil.iter_modules(self.config["modules_paths"])))
         for (importer, name, ispkg) in \
                 pkgutil.iter_modules(self.config["modules_paths"]):
+            logger.debug('Checking module: %s', name)
             if name in self.config["load_modules"] \
                     and name not in self.config["block_modules"]:
                 try:
                     self.load_module_with_importer(importer, name)
+                    logger.debug('Loaded module: %s', name)
                 except BaseException:
-                    logger.exception("Cannot load %s", name)
+                    logger.exception('Cannot load: %s', name)
+            else:
+                logger.debug('Module not marked to be loaded: %s', name)
+
 
     def load_module_with_importer(self, importer, pack_name, \
             load_modules=None):
-        logger.info("Loading modules from pack: %s", pack_name)
+        logger.debug('Loading modules from pack: %s', pack_name)
         loader = importer.find_module(pack_name)
         module_pack = loader.load_module(pack_name)
         module_names = module_pack.__module_class_names__

@@ -5,6 +5,8 @@ ident = "igglybuff"
 name = "igglybuff pythonic IRC bot in development"
 nickserv_passwd = None
 host = "euroserv.fr.quakenet.org"
+# cooldown - seconds before retrying to connect after kick
+cooldown = 10
 port = 6667
 ssl = False
 channels = [
@@ -16,7 +18,7 @@ encoding = "utf-8"
 
 #import os.path
 modules_paths = [
-        '/misc/projects/ScytheBot/ircbot/modules'
+        '/misc/projects/ScytheBot/ircbot/modules/'
         ]
 load_modules = [
         "admin",
