@@ -10,13 +10,16 @@ import bot
 
 logger = logging.getLogger(__name__)
 
-CONF = os.path.expanduser('ircbot/config.py')
+CONF = '/misc/projects/ScytheBot/ircbot/config.py'
 
 if __name__ == '__main__':
     config = imp.load_source('config', CONF)
     logging.basicConfig(filename=config.log_file, \
             level=getattr(logging, config.log_level.upper()), \
             format=config.log_format, datefmt=config.log_datefmt)
+    logger.debug('Config file: %s', CONF)
+    logger.debug('Modules paths:\n%s',
+            '\n'.join(config.modules_paths))
     while 1:
         ircbot = bot.Bot(config)
         try:
