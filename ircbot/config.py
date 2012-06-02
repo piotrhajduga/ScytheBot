@@ -26,7 +26,7 @@ load_modules = [
         ]
 block_modules = []
 
-log_level = 'INFO'
+log_level = 'DEBUG'
 log_file = None
-log_format = '%(asctime)s - %(levelname)s - %(message)s'
+log_format = '%(levelname)s|%(filename)s:%(lineno)s|%(message)s'
 log_datefmt = '%H:%M:%S'
