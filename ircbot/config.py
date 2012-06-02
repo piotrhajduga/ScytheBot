@@ -16,9 +16,9 @@ channels = [
 autorejoin = True
 encoding = "utf-8"
 
-#import os.path
+import os.path
 modules_paths = [
-        '/misc/projects/ScytheBot/ircbot/modules/'
+        os.path.expanduser('~/.ircbot/modules/')
         ]
 load_modules = [
         "admin",
