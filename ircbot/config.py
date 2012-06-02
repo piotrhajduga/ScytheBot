@@ -10,21 +10,21 @@ ssl = False
 channels = [
         #"#inf.aei.polsl.pl",
         "#lobos",
-		]
+        ]
 autorejoin = True
 encoding = "utf-8"
 
 import os.path
 modules_paths = [
-		os.path.expanduser("modules/")
-		]
+        os.path.expanduser("modules/")
+        ]
 load_modules = [
-		"admin",
-		"jiggly",
-		"ping",
-		"parrot",
-		"dice"
-		]
+        "admin",
+        "jiggly",
+        "ping",
+        "parrot",
+        "dice"
+        ]
 block_modules = []
 
 log_level = 'DEBUG'
