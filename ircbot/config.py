@@ -9,24 +9,24 @@ port = 6667
 ssl = False
 channels = [
         "#channel"
-		]
+        ]
 autorejoin = True
 encoding = "utf-8"
 
 import os.path
 modules_paths = [
-		os.path.expanduser("~/.ircbot/modules/")
-		]
+        os.path.expanduser("~/.ircbot/modules/")
+        ]
 load_modules = [
-		"admin",
-		"jiggly",
-		"ping",
-		"parrot",
-		"dice"
-		]
+        "admin",
+        "jiggly",
+        "ping",
+        "parrot",
+        "dice"
+        ]
 block_modules = []
 
-log_level = 'INFO'
+log_level = 'DEBUG'
 log_file = None
-log_format = '%(asctime)s - %(levelname)s - %(message)s'
+log_format = '%(levelname)s|%(filename)s:%(lineno)s|%(message)s'
 log_datefmt = '%H:%M:%S'

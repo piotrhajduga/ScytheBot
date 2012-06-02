@@ -2,7 +2,6 @@ import logging
 import socket
 import ssl
 import re
-import traceback
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +40,7 @@ class IRC(object):
             self.config["name"] = config.name
             self.config["password"] = config.password
             self.config["encoding"] = config.encoding or "utf-8"
-        except Exception as exc:
+        except Exception:
             logger.error('Bad configuration')
             raise BadConfigurationException()
 
@@ -59,7 +58,7 @@ class IRC(object):
             self.msg("NICK %s" % self.config["nick"])
             self.msg("USER %s %s %s :%s" % (self.config["ident"], \
                     self.config["host"], self.config["nick"], self.config["name"]))
-        except socket.error as err:
+        except socket.error:
             logger.exception('Error connecting to the socket')
             raise ConnectionFailureException()
 
@@ -98,16 +97,19 @@ class IRC(object):
 
     def main_loop(self):
         while 1:
-            read = self.irc.recv(512)
-            if not read:
-                raise LostConnectionException()
-            self.buffer = self.buffer + read.decode(self.config["encoding"])
-            temp = self.buffer.split("\n")
-            self.buffer = temp.pop()
-            for line in temp:
-                line = line.rstrip()
-                logger.info("read < %s" % line)
-                self.dispatch(line)
+            try:
+                read = self.irc.recv(512)
+                if not read:
+                    raise LostConnectionException()
+                self.buffer = self.buffer + read.decode(self.config["encoding"])
+                temp = self.buffer.split("\n")
+                self.buffer = temp.pop()
+                for line in temp:
+                    line = line.rstrip()
+                    logger.info("read < %s" % line)
+                    self.dispatch(line)
+            except UnicodeDecodeError:
+                logger.warn('Cannot decode incoming string')
 
     def msg(self, msg):
         logger.info("sending > %s" % msg)

@@ -2,7 +2,6 @@ import logging
 import irc
 import pkgutil
 import re
-import traceback
 import time
 from threading import Timer
 from threading2 import Thread
@@ -105,18 +104,25 @@ class Bot(irc.IRC):
         self.load_modules()
 
     def load_modules(self):
+        logger.debug('Loading modules from directories:\n%s',
+                self.config["modules_paths"])
         for (importer, name, ispkg) in \
                 pkgutil.iter_modules(self.config["modules_paths"]):
+            logger.debug('Checking module: %s', name)
             if name in self.config["load_modules"] \
                     and name not in self.config["block_modules"]:
                 try:
                     self.load_module_with_importer(importer, name)
-                except BaseException as exc:
-                    logger.exception("Cannot load %s", name)
+                    logger.debug('Loaded module: %s', name)
+                except BaseException:
+                    logger.exception('Cannot load: %s', name)
+            else:
+                logger.debug('Module not marked to be loaded: %s', name)
+
 
     def load_module_with_importer(self, importer, pack_name, \
             load_modules=None):
-        logger.info("Loading modules from pack: %s", pack_name)
+        logger.debug('Loading modules from pack: %s', pack_name)
         loader = importer.find_module(pack_name)
         module_pack = loader.load_module(pack_name)
         module_names = module_pack.__module_class_names__
@@ -135,7 +141,7 @@ class Bot(irc.IRC):
                         if self.modules[obj.handler_type] is None:
                             self.modules[obj.handler_type] = list()
                         self.modules[obj.handler_type].insert(0, mdl)
-                except BaseException as exc:
+                except BaseException:
                     logger.exception('Cannot load %s from %s', \
                             module_name, pack_name)
 
@@ -146,7 +152,7 @@ class Bot(irc.IRC):
             try:
                 self.load_module_with_importer(importer, name, \
                         load_modules=load_modules)
-            except BaseException as exc:
+            except BaseException:
                 logger.exception('Cannot load %s', name)
 
     def unload_module(self, pack_name, module_name=None):
@@ -165,8 +171,7 @@ class Bot(irc.IRC):
         prepared = {}
         for key in config:
             if not isinstance(config[key][0], config[key][1]):
-                raise ConfigException('config option %s needs %s, \
-                        but %s given' \
+                raise ConfigException('config option %s needs %s, but %s given'
                         % (key, config[key][1], config[key][0]))
             else:
                 prepared[key] = config[key][0]
@@ -178,15 +183,12 @@ class Bot(irc.IRC):
             if match is None:
                 continue
             logger.debug("Matching module: %s" % mdl[2].__class__)
-            try:
-                obj = Wrapper(self)
-                obj.sender = sender
-                obj.cmd = cmd
-                obj.params = params
-                obj.match = match
-                mdl[2].run(obj, (cmd, params))
-            except BaseException:
-                logger.exception("Something went wrong")
+            obj = Wrapper(self)
+            obj.sender = sender
+            obj.cmd = cmd
+            obj.params = params
+            obj.match = match
+            mdl[2].run(obj, (cmd, params))
 
     def handle_privmsg(self, sender, target, msg):
         dont_do = list()
@@ -198,30 +200,12 @@ class Bot(irc.IRC):
             if match is None:
                 continue
             logger.debug("Matching module: %s" % mdl[2].__class__)
-            try:
-                obj = Wrapper(self)
-                obj.sender = sender
-                obj.target = target
-                obj.line = msg
-                obj.match = match
-                if mdl[2].config['threadable']:
-                    run_in_background(mdl[2].config['thread_timeout'])(mdl[2].run)(obj, (sender, msg))
-                else:
-                    mdl[2].run(obj, (sender, msg))
-            except BaseException:
-                logger.exception("Something went wrong")
-
-#    def handle_kick(self, params):
-#        for mdl in self.modules["kick"]:
-#            match = mdl[1].match(msg)
-#            if match is None:
-#                continue
-#            self.verbose_msg("\t%s: match!" % mdl[2].__class__)
-#            try:
-#                obj = Wrapper(self)
-#                obj.params = params
-#                obj.match = match
-#                mdl[2].run(obj, (sender, msg))
-#            except BaseException:
-#                self.verbose_msg("error ! something went wrong")
-#                traceback.print_exc()
+            obj = Wrapper(self)
+            obj.sender = sender
+            obj.target = target
+            obj.line = msg
+            obj.match = match
+            if mdl[2].config['threadable']:
+                run_in_background(mdl[2].config['thread_timeout'])(mdl[2].run)(obj, (sender, msg))
+            else:
+                mdl[2].run(obj, (sender, msg))

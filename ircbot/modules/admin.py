@@ -26,8 +26,7 @@ DB_FILE = os.path.expanduser('~/.ircbot/modulefiles/admins.db')
 def is_authorised(sender):
     with sqlite3.connect(DB_FILE) as db:
         query = 'SELECT * FROM admins WHERE sender=?'
-        db.cursor().execute(query, sender)
-        rowcount = db.cursor().rowcount
+        rowcount = len(db.execute(query, (sender,)).fetchall())
     return rowcount
 
 class Autojoin(Module):
@@ -58,19 +57,19 @@ class Auth(Module):
             db.cursor().execute(query)
     
     def run(self, bot, params):
+        if is_authorised(bot.sender):
+            bot.say(bot.sender.split("!")[0],"You already are authorized.")
+            return
         with sqlite3.connect(DB_FILE) as db:
-            if is_authorised(bot.sender):
-                bot.say(bot.sender.split("!")[0],"You already are authorized.")
-                return
             username = bot.match.groups()[0]
             password = bot.match.groups()[1].encode(bot.config["encoding"])
             password = hashlib.md5(password).hexdigest()
             query = 'UPDATE admins SET sender=? WHERE nick=? AND pass=?'
-            db.cursor().execute(query, bot.sender, username, password)
-            if db.cursor().rowcount:
-                bot.say(bot.sender.split("!")[0],"Succesfully authorized.")
-            else:
-                bot.say(bot.sender.split("!")[0],"Unable to authorize.")
+            db.cursor().execute(query, (bot.sender, username, password))
+        if is_authorised(bot.sender):
+            bot.say(bot.sender.split("!")[0],"Succesfully authorized.")
+        else:
+            bot.say(bot.sender.split("!")[0],"Unable to authorize.")
 
 class Deauth(Module):
     def __init__(self, bot, config):
