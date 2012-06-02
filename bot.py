@@ -104,8 +104,8 @@ class Bot(irc.IRC):
         self.load_modules()
 
     def load_modules(self):
-        logger.debug('Loading modules:\n%s',
-                '\n'.join(pkgutil.iter_modules(self.config["modules_paths"])))
+        logger.debug('Loading modules from directories:\n%s',
+                self.config["modules_paths"])
         for (importer, name, ispkg) in \
                 pkgutil.iter_modules(self.config["modules_paths"]):
             logger.debug('Checking module: %s', name)
