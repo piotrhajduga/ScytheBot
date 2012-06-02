@@ -1,21 +1,22 @@
 # -*- coding: utf-8 -*-
 password = None
-nick = "scythebot"
-ident = "scythebot"
-name = "scythebot pythonic IRC bot in development"
+nick = "igglybuff"
+ident = "igglybuff"
+name = "igglybuff pythonic IRC bot in development"
 nickserv_passwd = None
-host = "host"
+host = "euroserv.fr.quakenet.org"
 port = 6667
 ssl = False
 channels = [
-        "#channel"
+        #"#inf.aei.polsl.pl",
+        "#lobos",
 		]
 autorejoin = True
 encoding = "utf-8"
 
 import os.path
 modules_paths = [
-		os.path.expanduser("~/.ircbot/modules/")
+		os.path.expanduser("modules/")
 		]
 load_modules = [
 		"admin",
@@ -26,7 +27,7 @@ load_modules = [
 		]
 block_modules = []
 
-log_level = 'INFO'
+log_level = 'DEBUG'
 log_file = None
-log_format = '%(asctime)s - %(levelname)s - %(message)s'
+log_format = '%(levelname)s|%(filename)s:%(lineno)s|%(message)s'
 log_datefmt = '%H:%M:%S'
