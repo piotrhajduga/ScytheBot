@@ -2,7 +2,6 @@ import logging
 import socket
 import ssl
 import re
-import traceback
 
 logger = logging.getLogger(__name__)
 
@@ -16,23 +15,34 @@ class ConnectionFailureException(Exception):
     pass
 
 
+class BadConfigurationException(Exception):
+    pass
+
+
 class IRC(object):
-    def __init__(self, nick, ident, name, host, port=6667, \
-            use_ssl=False, password=None, encoding="utf-8"):
+    def __init__(self, config):
         self.connected = False
-        self.buffer = ""
+        self.buffer = str()
         self.irc = None
-        self.config = dict()
-        self.config["host"] = host
-        self.config["port"] = port
-        self.config["ssl"] = use_ssl
-        self.config["nick"] = nick
-        self.config["ident"] = ident
-        self.config["name"] = name
-        self.config["password"] = password
-        self.config["encoding"] = encoding
+        self.config = None
+        self.set_config(config)
         self.patterns = dict()
         self.dispatcher_prepare()
+
+    def set_config(self, config):
+        self.config = dict()
+        try:
+            self.config["host"] = config.host
+            self.config["port"] = config.port or 6667
+            self.config["ssl"] = config.ssl
+            self.config["nick"] = config.nick
+            self.config["ident"] = config.ident
+            self.config["name"] = config.name
+            self.config["password"] = config.password
+            self.config["encoding"] = config.encoding or "utf-8"
+        except Exception:
+            logger.error('Bad configuration')
+            raise BadConfigurationException()
 
     def connect(self):
         try:
@@ -43,18 +53,18 @@ class IRC(object):
             logger.info("Connected to %s:%s", self.config["host"], self.config["port"])
             if self.config["password"]:
                 self.msg("PASS %s" % self.config["password"])
-            logger.info("Identifying as %s (user:%s,name:%s)", self.config["nick"], self.config["ident"], self.config["name"])
+            logger.info("Identifying as %s (user:%s,name:%s)", \
+                    self.config["nick"], self.config["ident"], self.config["name"])
             self.msg("NICK %s" % self.config["nick"])
             self.msg("USER %s %s %s :%s" % (self.config["ident"], \
                     self.config["host"], self.config["nick"], self.config["name"]))
-        except socket.error as err:
+        except socket.error:
             logger.exception('Error connecting to the socket')
             raise ConnectionFailureException()
 
     def dispatcher_prepare(self):
         self.patterns["cmd"] = r"^\:([^ ]+)[ ]+([^ ]+)[ ]+\:?([^ ].*)?$"
-        self.patterns["privmsg"] = \
-                r"^\:([^ ]+)[ ]+PRIVMSG[ ]+([^ ]+)[ ]+\:?([^ ].*)?$"
+        self.patterns["privmsg"] = r"^\:([^ ]+)[ ]+PRIVMSG[ ]+([^ ]+)[ ]+\:?([^ ].*)?$"
         self.patterns["kick"] = r"^\:([^ ]+)[ ]+KICK[ ]+\:?([^ ].*)?$"
         self.patterns["ping"] = r"^PING[ ]+\:?([^ ].*)?$"
         for ptrn in self.patterns:
@@ -98,13 +108,8 @@ class IRC(object):
                     line = line.rstrip()
                     logger.info("read < %s" % line)
                     self.dispatch(line)
-            except KeyboardInterrupt as exc:
-                raise exc
-            except LostConnectionException as exc:
-                raise exc
-            except:
-                self.msg("error ! unhandled exception")
-                traceback.print_exc()
+            except UnicodeDecodeError:
+                logger.warn('Cannot decode incoming string')
 
     def msg(self, msg):
         logger.info("sending > %s" % msg)

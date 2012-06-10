@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 __module_class_names__ = [
-<<<<<<< HEAD
         "Auth",
+        "Deauth",
         "Autojoin",
         "Join",
         "Part",
@@ -11,28 +11,25 @@ __module_class_names__ = [
         "Reload",
         "CoreDump",
         ]
-=======
-		"Auth",
-		"Autojoin",
-		"Join",
-		"Part",
-		"Nick",
-		"Send",
-		"Msg",
-		"Reload",
-		"CoreDump",
-		]
->>>>>>> 72f9bbe5365e0d1edec3d6b195b1a19936db43ac
 
 from bot import Module
-import traceback,os.path
-import pickle,hashlib
+import traceback
+import os.path
+import sqlite3
+import hashlib
+import logging
 
-FNAME_A = os.path.expanduser('~/.ircbot/modulefiles/bot_admins.pickle')
-bot_admins = list() # ("nick", md5("password"), "nick!username@host")
+logger = logging.getLogger(__name__)
+
+DB_FILE = os.path.expanduser('~/.ircbot/modulefiles/admins.db')
+
+def is_authorised(sender):
+    with sqlite3.connect(DB_FILE) as db:
+        query = 'SELECT * FROM admins WHERE sender=?'
+        rowcount = len(db.execute(query, (sender,)).fetchall())
+    return rowcount
 
 class Autojoin(Module):
-<<<<<<< HEAD
     def __init__(self, bot, config):
         Module.__init__(self, bot, config)
         self.handler_type = "cmd"
@@ -48,28 +45,49 @@ class Auth(Module):
         Module.__init__(self, bot, config)
         self.handler_type = "privmsg"
         self.rule = r"^\.auth[ ]+([^ ]+)[ ]+([^ ]+)$"
-        global bot_admins
-        try:
-            bot_admins = pickle.Unpickler(open(FNAME_A,'rb')).load()
-        except EOFError:
-            bot.verbose_msg("error ! cannot load administrators data")
+        self.create_tables()
+
+    def create_tables(self):
+        with sqlite3.connect(DB_FILE) as db:
+            query = '''CREATE TABLE IF NOT EXISTS admins
+                (id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL,
+                 nick TEXT NOT NULL,
+                 sender TEXT,
+                 pass TEXT NOT NULL)'''
+            db.cursor().execute(query)
     
     def run(self, bot, params):
-        global bot_admins
-        if bot.sender in [x[2] for x in bot_admins]:
+        if is_authorised(bot.sender):
             bot.say(bot.sender.split("!")[0],"You already are authorized.")
             return
-        username = bot.match.groups()[0]
-        password = bot.match.groups()[1].encode(bot.config["encoding"])
-        password = hashlib.md5(password).hexdigest()
-        for x in bot_admins:
-            print("%s,%s == %s,%s" % (username,password,x[0],x[1]))
-            if (username,password) == (x[0],x[1]):
-                x[2] = bot.sender
-                bot.say(bot.sender.split("!")[0],"Succesfully authorized.")
-                pickle.Pickler(open(FNAME_A,'wb')).dump(bot_admins)
-                return
+        with sqlite3.connect(DB_FILE) as db:
+            username = bot.match.groups()[0]
+            password = bot.match.groups()[1].encode(bot.config["encoding"])
+            password = hashlib.md5(password).hexdigest()
+            query = 'UPDATE admins SET sender=? WHERE nick=? AND pass=?'
+            db.cursor().execute(query, (bot.sender, username, password))
+        if is_authorised(bot.sender):
+            bot.say(bot.sender.split("!")[0],"Succesfully authorized.")
+        else:
             bot.say(bot.sender.split("!")[0],"Unable to authorize.")
+
+class Deauth(Module):
+    def __init__(self, bot, config):
+        Module.__init__(self, bot, config)
+        self.handler_type = "privmsg"
+        self.rule = r"^\.deauth$"
+
+    def run(self, bot, params):
+        with sqlite3.connect(DB_FILE) as db:
+            if not is_authorised(bot.sender):
+                bot.say(bot.sender.split("!")[0],"You are not authorized.")
+                return
+            query = 'UPDATE admins SET sender="" WHERE sender=?'
+            db.cursor().execute(query, (bot.sender,))
+            if db.cursor().rowcount:
+                bot.say(bot.sender.split("!")[0],"Succesfully deauthorized.")
+            else:
+                bot.say(bot.sender.split("!")[0],"Unable to deauthorize.")
 
 class Join(Module):
     def __init__(self, bot, config):
@@ -78,7 +96,7 @@ class Join(Module):
         self.rule = r"\.join (\#[^ ]+)"
     
     def run(self, bot, params):
-        if bot.sender not in [x[2] for x in bot_admins]:
+        if not is_authorised(bot.sender):
             return
         bot.msg("JOIN %s" % bot.match.groups()[0])
         bot.say(bot.match.groups()[0], "Hello!")
@@ -91,7 +109,7 @@ class Part(Module):
         self.rule = r"\.part (\#[^ ]+)"
     
     def run(self, bot, params):
-        if bot.sender not in [x[2] for x in bot_admins]:
+        if not is_authorised(bot.sender):
             return
         bot.msg("PART %s" % bot.match.groups(0))
 
@@ -102,7 +120,7 @@ class Nick(Module):
         self.rule = r"\.nick ([^ ]+)"
     
     def run(self, bot, params):
-        if bot.sender not in [x[2] for x in bot_admins]:
+        if not is_authorised(bot.sender):
             return
         bot.conf.nick = bot.match.group(0)
         bot.msg("NICK %s" % bot.match.groups(0))
@@ -114,9 +132,9 @@ class Msg(Module):
         self.rule = r"\.msg (\#[^ ]+)[ ]+([^ ].*)"
     
     def run(self, bot, params):
-        if bot.sender not in [x[2] for x in bot_admins]:
+        if not is_authorised(bot.sender):
             return
-        bot.say(bot.match.group(1),bot.match.group(2))
+        bot.say(bot.match.group(1), bot.match.group(2))
 
 class Send(Module):
     def __init__(self, bot, config):
@@ -125,7 +143,7 @@ class Send(Module):
         self.rule = r"\.send[ ]+([^ ].*)"
     
     def run(self, bot, params):
-        if bot.sender not in [x[2] for x in bot_admins]:
+        if not is_authorised(bot.sender):
             return
         bot.msg(bot.match.groups()[0])
 
@@ -136,7 +154,7 @@ class Reload(Module):
         self.rule = r"^\.(reload|unload)[ ]+([^ ]+)$"
     
     def run(self, bot, params):
-        if bot.sender not in [x[2] for x in bot_admins]:
+        if not is_authorised(bot.sender):
             return
         mn = bot.match.groups()[1]
         nick = params[0].split("!")[0]
@@ -164,150 +182,10 @@ class CoreDump(Module):
         self.rule = r"^\.core_dump$"
     
     def run(self, bot, params):
-        if bot.sender not in [x[2] for x in bot_admins]:
+        if not is_authorised(bot.sender):
             return
         #bot.say(bot.sender.split("!")[0],"yeah!")
         for k in bot.modules:
             print(k)
             for m in bot.modules[k]:
                 print("\t%s" % m[2])
-=======
-	def __init__(self, bot, config):
-		Module.__init__(self, bot, config)
-		self.handler_type = "cmd"
-		self.rule = r"376.*"
-	
-	def run(self, bot, params):
-		for chan in bot.config["channels"]:
-			bot.msg("JOIN %s" % chan)
-			#bot.say(chan, "Hello!")
-
-class Auth(Module):
-	def __init__(self, bot, config):
-		Module.__init__(self, bot, config)
-		self.handler_type = "privmsg"
-		self.rule = r"^\.auth[ ]+([^ ]+)[ ]+([^ ]+)$"
-		global bot_admins
-		try:
-			bot_admins = pickle.Unpickler(open(FNAME_A,'rb')).load()
-		except EOFError:
-			bot.verbose_msg("error ! cannot load administrators data")
-	
-	def run(self, bot, params):
-		global bot_admins
-		if bot.sender in [x[2] for x in bot_admins]:
-			bot.say(bot.sender.split("!")[0],"You already are authorized.")
-			return
-		username = bot.match.groups()[0]
-		password = bot.match.groups()[1].encode(bot.config["encoding"])
-		password = hashlib.md5(password).hexdigest()
-		for x in bot_admins:
-			print("%s,%s == %s,%s" % (username,password,x[0],x[1]))
-			if (username,password) == (x[0],x[1]):
-				x[2] = bot.sender
-				bot.say(bot.sender.split("!")[0],"Succesfully authorized.")
-				pickle.Pickler(open(FNAME_A,'wb')).dump(bot_admins)
-				return
-			bot.say(bot.sender.split("!")[0],"Unable to authorize.")
-
-class Join(Module):
-	def __init__(self, bot, config):
-		Module.__init__(self, bot, config)
-		self.handler_type = "privmsg"
-		self.rule = r"\.join (\#[^ ]+)"
-	
-	def run(self, bot, params):
-		if bot.sender not in [x[2] for x in bot_admins]:
-			return
-		bot.msg("JOIN %s" % bot.match.groups()[0])
-		bot.say(bot.match.groups()[0], "Hello!")
-		#bot.say(bot.match.groups()[0], "I have been told to join this channel by %s" % params[0])
-
-class Part(Module):
-	def __init__(self, bot, config):
-		Module.__init__(self, bot, config)
-		self.handler_type = "privmsg"
-		self.rule = r"\.part (\#[^ ]+)"
-	
-	def run(self, bot, params):
-		if bot.sender not in [x[2] for x in bot_admins]:
-			return
-		bot.msg("PART %s" % bot.match.groups(0))
-
-class Nick(Module):
-	def __init__(self, bot, config):
-		Module.__init__(self, bot, config)
-		self.handler_type = "privmsg"
-		self.rule = r"\.nick ([^ ]+)"
-	
-	def run(self, bot, params):
-		if bot.sender not in [x[2] for x in bot_admins]:
-			return
-		bot.conf.nick = bot.match.group(0)
-		bot.msg("NICK %s" % bot.match.groups(0))
-
-class Msg(Module):
-	def __init__(self, bot, config):
-		Module.__init__(self, bot, config)
-		self.handler_type = "privmsg"
-		self.rule = r"\.msg (\#[^ ]+)[ ]+([^ ].*)"
-	
-	def run(self, bot, params):
-		if bot.sender not in [x[2] for x in bot_admins]:
-			return
-		bot.say(bot.match.group(1),bot.match.group(2))
-
-class Send(Module):
-	def __init__(self, bot, config):
-		Module.__init__(self, bot, config)
-		self.handler_type = "privmsg"
-		self.rule = r"\.send[ ]+([^ ].*)"
-	
-	def run(self, bot, params):
-		if bot.sender not in [x[2] for x in bot_admins]:
-			return
-		bot.msg(bot.match.groups()[0])
-
-class Reload(Module):
-	def __init__(self, bot, config):
-		Module.__init__(self, bot, config)
-		self.handler_type = "privmsg"
-		self.rule = r"^\.(reload|unload)[ ]+([^ ]+)$"
-	
-	def run(self, bot, params):
-		if bot.sender not in [x[2] for x in bot_admins]:
-			return
-		mn = bot.match.groups()[1]
-		nick = params[0].split("!")[0]
-		try:
-			bot.unload_module(mn)
-		except:
-			bot.say(nick, "Unloading of module %s FAILED!" % mn)
-			traceback.print_exc()
-		else:
-			bot.say(nick, "Unloading of module %s SUCCESSFUL!" % mn)
-		if bot.match.groups()[0]=='unload':
-			return
-		try:
-			bot.load_module(mn)
-		except:
-			bot.say(nick, "Reloading of module %s FAILED!" % mn)
-			traceback.print_exc()
-		else:
-			bot.say(nick, "Reloading of module %s SUCCESSFUL!" % mn)
-
-class CoreDump(Module):
-	def __init__(self, bot, config):
-		Module.__init__(self, bot, config)
-		self.handler_type = "privmsg"
-		self.rule = r"^\.core_dump$"
-	
-	def run(self, bot, params):
-		if bot.sender not in [x[2] for x in bot_admins]:
-			return
-		#bot.say(bot.sender.split("!")[0],"yeah!")
-		for k in bot.modules:
-			print(k)
-			for m in bot.modules[k]:
-				print("\t%s" % m[2])
->>>>>>> 72f9bbe5365e0d1edec3d6b195b1a19936db43ac
