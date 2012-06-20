@@ -31,7 +31,7 @@ if __name__ == '__main__':
         except irc.LostConnectionException as exc:
             logger.error('Lost connection with the irc network')
             ircbot.close()
-            time.sleep(config.cooldown)
+            time.sleep(config.cooldown or 5)
             continue
         except irc.ConnectionFailureException as exc:
             logger.error('Cannot connect to the irc network')
