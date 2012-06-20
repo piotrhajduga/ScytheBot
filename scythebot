@@ -20,8 +20,8 @@ if __name__ == '__main__':
     logger.debug('Config file: %s', CONF)
     logger.debug('Modules paths:\n%s',
             '\n'.join(config.modules_paths))
+    ircbot = bot.Bot(config)
     while 1:
-        ircbot = bot.Bot(config)
         try:
             ircbot.connect()
             ircbot.main_loop()
