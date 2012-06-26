@@ -110,6 +110,9 @@ class IRC(object):
                     self.dispatch(line)
             except UnicodeDecodeError:
                 logger.warn('Cannot decode incoming string')
+            except socket.error:
+                logger.exception('Socket error.')
+                raise LostConnectionException()
 
     def msg(self, msg):
         logger.info("sending > %s" % msg)

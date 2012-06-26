@@ -119,7 +119,6 @@ class Bot(irc.IRC):
             else:
                 logger.debug('Module not marked to be loaded: %s', name)
 
-
     def load_module_with_importer(self, importer, pack_name, \
             load_modules=None):
         logger.debug('Loading modules from pack: %s', pack_name)
@@ -206,6 +205,7 @@ class Bot(irc.IRC):
             obj.line = msg
             obj.match = match
             if mdl[2].config['threadable']:
-                run_in_background(mdl[2].config['thread_timeout'])(mdl[2].run)(obj, (sender, msg))
+                timeout = mdl[2].config['thread_timeout']
+                run_in_background(timeout)(mdl[2].run)(obj, (sender, msg))
             else:
                 mdl[2].run(obj, (sender, msg))
