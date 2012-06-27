@@ -1,5 +1,9 @@
 # TODO
 
+Unify all data handled by different modules in one sqlite3 database.
+
+# Goals
+
 * support for multiple nicks in case the first is not available
 * non-IRC interface to manage the bot while it's connected
 * more detailed README.md with good configuration description
