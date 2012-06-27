@@ -20,8 +20,8 @@ if __name__ == '__main__':
     logger.debug('Config file: %s', CONF)
     logger.debug('Modules paths:\n%s',
             '\n'.join(config.modules_paths))
+    ircbot = bot.Bot(config)
     while 1:
-        ircbot = bot.Bot(config)
         try:
             ircbot.connect()
             ircbot.main_loop()
@@ -31,12 +31,15 @@ if __name__ == '__main__':
         except irc.LostConnectionException as exc:
             logger.error('Lost connection with the irc network')
             ircbot.close()
-            time.sleep(config.cooldown)
+            try:
+                time.sleep(config.cooldown)
+            except NameError:
+                time.sleep(5)
             continue
         except irc.ConnectionFailureException as exc:
             logger.error('Cannot connect to the irc network')
             sys.exit()
-        except BaseException as exc:
+        except Exception as exc:
             traceback.print_exc()
             ircbot.close()
             sys.exit()
