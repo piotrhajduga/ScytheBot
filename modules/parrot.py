@@ -3,23 +3,23 @@ __module_class_names__ = ["RememberSaying", "SaySaying","RememberYT","SayYT","Du
 
 from bot import Module
 from admin import is_authorised
-import pickle, re, os.path
+import re
 import random
 import logging
 
 logger = logging.getLogger(__name__)
 
-FNAME_S = os.path.expanduser('~/.ircbot/modulefiles/parrot_sayings.pickle')
-FNAME_Y = os.path.expanduser('~/.ircbot/modulefiles/parrot_yt_links.pickle')
-CHANCES = (6,2,10) # (remember,say,thank)
+CHANCES = {
+        'remember':6,
+        'say':2,
+        'thank':10
+        }
 CHOICES = (
         "I love you!",
         "<3",
         ":*",
         "you know that I know..."
         )
-sayings = list()
-yt_links = list()
 
 class RememberSaying(Module):
     def __init__(self, bot, config):
@@ -28,52 +28,51 @@ class RememberSaying(Module):
         self.config["thread_timeout"] = 1.0
         self.handler_type = "privmsg"
         self.rule = r'.*?(?:[a-zA-Z0-9_.,=?-]+?[:,])? *(.*)'
-        global sayings 
-        try:
-            sayings = pickle.Unpickler(open(FNAME_S,'rb')).load()
-        except IOError:
-            sayings = list()
-            pickle.Pickler(open(FNAME_S,'wb')).dump(sayings)
 
+    def create_tables(self, bot):
+        query = '''CREATE TABLE IF NOT EXISTS parrot_sayings
+            (id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL,
+             saying TEXT NOT NULL UNIQUE)'''
+        bot.modules_database.cursor().execute(query)
+ 
     def run(self, bot, params):
-        if random.randint(1,100)>CHANCES[0]:
+        if random.randint(1,100)>CHANCES['remember']:
             return
         regexp = r'.*(https?\://).*'
-        if re.match(regexp,bot.line):
+        if re.match(regexp, bot.line):
             return
         regexp = r'[.-_/\\].*'
         if re.match(regexp,bot.line):
             return
         global sayings 
         saying = bot.match.groups()[0]
-        sayings.append(saying)
-        pickle.Pickler(open(FNAME_S,'wb')).dump(sayings)
-        if random.randint(1,100)<=CHANCES[2]:
+        query = 'INSERT INTO sayings (saying) VALUES (?)'
+        bot.modules_database.cursor().execute(query, (saying,))
+        if random.randint(1,100)<=CHANCES['thank']:
             bot.say(bot.target, "Remembered!")
             return
-        if random.randint(1,100)>CHANCES[1]:
+        if random.randint(1,100)>CHANCES['say']:
             return
-        bot.say(bot.target,bot.sender.split("!")[0] + ": " + random.choice(CHOICES))
+        bot.say(bot.target, '{0}: {1}'.format(
+            bot.sender.split("!")[0], random.choice(CHOICES)))
 
 class SaySaying(Module):
     def __init__(self, bot, config):
         Module.__init__(self, bot, config)
         self.handler_type = "privmsg"
         self.rule = r'([a-zA-Z0-9_.,=?-]+?[:,])?.*'
-        global sayings
-        try:
-            sayings = pickle.Unpickler(open(FNAME_S,'rb')).load()
-        except IOError:
-            sayings = list()
-            pickle.Pickler(open(FNAME_S,'wb')).dump(sayings)
 
     def run(self, bot, params):
-        modifier = (bot.match.group(0) and (bot.config["nick"] in bot.match.group(0))) and 34 or 0
-        if random.randint(1,100)>(CHANCES[1]+modifier):
+        modifier = 0
+        if bot.match.group(0) and (bot.config["nick"] in bot.match.group(0)):
+            modifier = 34
+        if random.randint(1,100) > (CHANCES['say'] + modifier):
             return
-        global sayings 
-        if sayings:
-            bot.say(bot.target, bot.sender.split("!")[0] + ": " + random.choice(sayings))
+        query = 'SELECT saying FROM sayings ORDER BY RANDOM() LIMIT 1'
+        row = bot.modules_database.execute(query).fetchone()
+        if row:
+            bot.say(bot.target, '{0}: {1}'.format(
+                bot.sender.split("!")[0], row['saying']))
 
 class RememberYT(Module):
     def __init__(self, bot, config):
@@ -82,20 +81,22 @@ class RememberYT(Module):
         self.config["thread_timeout"] = 1.0
         self.handler_type = "privmsg"
         self.rule = r'.*(http\://[a-z0-9]+\.youtube\.[a-z]+/watch\?v=[a-zA-Z0-9\-_\+\,\.]+)\&?.*'
-        global yt_links
-        try:
-            yt_links = pickle.Unpickler(open(FNAME_Y,'rb')).load()
-        except IOError:
-            yt_links = list()
-            pickle.Pickler(open(FNAME_Y,'wb')).dump(yt_links)
 
+    def create_tables(self, bot):
+        query = '''CREATE TABLE IF NOT EXISTS parrot_yt_links
+            (id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL,
+             link TEXT NOT NULL UNIQUE)'''
+        bot.modules_database.cursor().execute(query)
+ 
     def run(self, bot, params):
-        global yt_links
-        if not bot.match.group(1) in yt_links:
-            yt_links.append(bot.match.group(1))
-            pickle.Pickler(open(FNAME_Y,'wb')).dump(yt_links)
-        else: return
-        if random.randint(1,100)>CHANCES[2]:
+        link = bot.match.group(1)
+        query = 'SELECT * FROM parrot_yt_links WHERE link=?'
+        rowcount = len(bot.modules_database.execute(query, (link,)).fetchall())
+        if rowcount:
+            return
+        query = 'INSERT INTO parrot_yt_links (link) VALUES (?)'
+        bot.modules_database.cursor().execute(query, (link,))
+        if random.randint(1,100)>CHANCES['thank']:
             return
         choices = ("I love you!","<3",":*",
                 "you know that I know...",
@@ -110,19 +111,13 @@ class SayYT(Module):
         self.config["thread_timeout"] = 1.0
         self.handler_type = "privmsg"
         self.rule = r'%s[:,].*?(link|jutub|tube|film).*' % bot.config["nick"]
-        global yt_links
-        try:
-            yt_links = pickle.Unpickler(open(FNAME_Y,'rb')).load()
-        except EOFError:
-            yt_links = list()
-            pickle.Pickler(open(FNAME_Y,'wb')).dump(yt_links)
 
     def run(self, bot, params):
-        global yt_links
-        if not yt_links:
-            bot.say(bot.target, bot.sender.split("!")[0] + ": sorry, don't know any...")
-            return
-        bot.say(bot.target, bot.sender.split("!")[0] + ": " + random.choice(yt_links))
+        query = 'SELECT saying FROM parrot_sayings ORDER BY RANDOM() LIMIT 1'
+        row = bot.modules_database.execute(query).fetchone()
+        message = row['link'] if row else "sorry, don't know any..."
+        bot.say(bot.target, '{0}: {1}'.format(
+            bot.sender.split('!')[0], message))
 
 class Dump(Module):
     def __init__(self, bot, config):
@@ -133,14 +128,16 @@ class Dump(Module):
         self.rule = r'\.dump'
     
     def run(self, bot, params):
-        if not is_authorised(bot.sender):
+        if not is_authorised(bot.modules_database, bot.sender):
             logger.warn("Unauthorized attempt to dump the database")
             return
-        global sayings
-        global yt_links
         logger.info("yt_links:")
-        for x in yt_links:
-            logger.info("%s", x)
+        query = 'SELECT * FROM parrot_sayings'
+        sayings = bot.modules_database.execute(query).fetchall()
+        query = 'SELECT * FROM parrot_yt_links'
+        yt_links = bot.modules_database.execute(query).fetchall()
+        for link in yt_links:
+            logger.info("%d: %s", link['id'], link['link'])
         logger.info("sayings:")
-        for x in sayings:
-            logger.info("%s", x)
+        for saying in sayings:
+            logger.info("%d: %s", saying['id'], saying['saying'])

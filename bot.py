@@ -3,6 +3,7 @@ import irc
 import pkgutil
 import re
 import time
+import sqlite3
 from threading import Timer
 from threading2 import Thread
 
@@ -91,21 +92,30 @@ class Module(object):
 
 
 class Bot(irc.IRC):
+    modules = dict()  # { "type" : ("pack_name", "regexp", "module") }
+    modules_database = None
+
     def __init__(self, config):
         irc.IRC.__init__(self, config)
-        from os.path import abspath,expandvars
-        self.config["modules_paths"] = [abspath(expandvars(path))
+        from os.path import expanduser,expandvars
+        self.config["modules_paths"] = [expanduser(expandvars(path))
                 for path in config.modules_paths]
         self.config["modules_database_path"] = \
-                abspath(expandvars(config.modules_database_path))
+                expanduser(expandvars(config.modules_database_path))
+        logger.debug('Modules database path = %s',
+                self.config["modules_database_path"])
+        self.modules_database_connect()
         self.config["load_modules"] = config.load_modules
         self.config["block_modules"] = config.block_modules
         self.config["channels"] = config.channels
-        self.modules = dict()  # { "type" : ("pack_name", "regexp", "module") }
         self.modules["privmsg"] = list()
         self.modules["cmd"] = list()
         self.modules["kick"] = list()
         self.load_modules()
+
+    def modules_database_connect(self):
+        self.modules_database = sqlite3.connect(
+                self.config["modules_database_path"])
 
     def load_modules(self):
         logger.debug('Loading modules from directories:\n%s',
