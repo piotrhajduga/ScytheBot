@@ -93,7 +93,7 @@ class Module(object):
 
 class Bot(irc.IRC):
     modules = dict()  # { "type" : ("pack_name", "regexp", "module") }
-    modules_database = None
+    db = None
 
     def __init__(self, config):
         irc.IRC.__init__(self, config)
@@ -104,7 +104,6 @@ class Bot(irc.IRC):
                 expanduser(expandvars(config.modules_database_path))
         logger.debug('Modules database path = %s',
                 self.config["modules_database_path"])
-        self.modules_database_connect()
         self.config["load_modules"] = config.load_modules
         self.config["block_modules"] = config.block_modules
         self.config["channels"] = config.channels
@@ -113,9 +112,16 @@ class Bot(irc.IRC):
         self.modules["kick"] = list()
         self.load_modules()
 
-    def modules_database_connect(self):
-        self.modules_database = sqlite3.connect(
-                self.config["modules_database_path"])
+    def get_db(self):
+        if not self.db:
+            self.db = sqlite3.connect(self.config["modules_database_path"])
+            self.db.isolation_level = None
+        return self.db
+
+    def close(self):
+        if self.db:
+            self.db.close()
+        irc.IRC.close(self)
 
     def load_modules(self):
         logger.debug('Loading modules from directories:\n%s',
