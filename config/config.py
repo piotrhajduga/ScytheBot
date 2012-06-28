@@ -13,20 +13,20 @@ channels = [
 autorejoin = True
 encoding = "utf-8"
 
-import os.path
-modules_paths = [
-        os.path.expanduser("~/.ircbot/modules/")
-        ]
+modules_paths = ['~/.scythebot/modules/',]
 load_modules = [
         "admin",
         "jiggly",
         "ping",
         "parrot",
-        "dice"
+        "dice",
         ]
 block_modules = []
+modules_database_path = '~/.scythebot/modules_data.sqlite3'
 
 log_level = 'DEBUG'
 log_file = None
 log_format = '%(levelname)s|%(filename)s:%(lineno)s|%(message)s'
 log_datefmt = '%H:%M:%S'
+
+cooldown = 5

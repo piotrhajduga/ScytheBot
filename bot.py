@@ -93,7 +93,11 @@ class Module(object):
 class Bot(irc.IRC):
     def __init__(self, config):
         irc.IRC.__init__(self, config)
-        self.config["modules_paths"] = config.modules_paths
+        from os.path import abspath,expandvars
+        self.config["modules_paths"] = [abspath(expandvars(path))
+                for path in config.modules_paths]
+        self.config["modules_database_path"] = \
+                abspath(expandvars(config.modules_database_path))
         self.config["load_modules"] = config.load_modules
         self.config["block_modules"] = config.block_modules
         self.config["channels"] = config.channels
