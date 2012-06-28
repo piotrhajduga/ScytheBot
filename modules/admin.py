@@ -47,7 +47,7 @@ class Auth(Module):
              nick TEXT NOT NULL,
              sender TEXT,
              pass TEXT NOT NULL)'''
-        bot.get_db().cursor().execute(query)
+        bot.get_db().execute(query)
     
     def run(self, bot, params):
         if is_authorised(bot.get_db(), bot.sender):
@@ -57,7 +57,7 @@ class Auth(Module):
         password = bot.match.groups()[1].encode(bot.config["encoding"])
         password = hashlib.md5(password).hexdigest()
         query = 'UPDATE admins SET sender=? WHERE nick=? AND pass=?'
-        bot.get_db().cursor().execute(query,
+        bot.get_db().execute(query,
                 (bot.sender, username, password))
         if is_authorised(bot.get_db(), bot.sender):
             bot.say(bot.sender.split("!")[0],"Succesfully authorized.")
