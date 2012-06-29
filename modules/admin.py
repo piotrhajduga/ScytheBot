@@ -16,23 +16,28 @@ from bot import Module
 import traceback
 import hashlib
 import logging
+from contextlib import closing
 
 logger = logging.getLogger(__name__)
 
+
 def is_authorised(db, sender):
     query = 'SELECT * FROM admins WHERE sender=?'
-    rowcount = len(db.execute(query, (sender,)).fetchall())
-    return rowcount
+    with closing(db.cursor()) as cur:
+        cur.execute(query, (sender,))
+        return cur.rowcount
+
 
 class Autojoin(Module):
     def __init__(self, bot, config):
         Module.__init__(self, bot, config)
         self.handler_type = "cmd"
         self.rule = r"376.*"
-    
+
     def run(self, bot, params):
         for chan in bot.config["channels"]:
             bot.msg("JOIN %s" % chan)
+
 
 class Auth(Module):
     def __init__(self, bot, config):
@@ -49,12 +54,12 @@ class Auth(Module):
              pass TEXT NOT NULL)'''
         with bot.get_db() as db:
             db.execute(query)
-    
+
     def run(self, bot, params):
         with bot.get_db() as db:
             authorised = is_authorised(db, bot.sender)
         if authorised:
-            bot.say(bot.sender.split("!")[0],"You already are authorized.")
+            bot.say(bot.sender.split("!")[0], "You already are authorized.")
             return
         username = bot.match.groups()[0]
         password = bot.match.groups()[1].encode(bot.config["encoding"])
@@ -64,9 +69,10 @@ class Auth(Module):
             db.execute(query,
                     (bot.sender, username, password))
         if authorised:
-            bot.say(bot.sender.split("!")[0],"Succesfully authorized.")
+            bot.say(bot.sender.split("!")[0], "Succesfully authorized.")
         else:
-            bot.say(bot.sender.split("!")[0],"Unable to authorize.")
+            bot.say(bot.sender.split("!")[0], "Unable to authorize.")
+
 
 class Deauth(Module):
     def __init__(self, bot, config):
@@ -78,102 +84,107 @@ class Deauth(Module):
         with bot.get_db() as db:
             authorised = is_authorised(db, bot.sender)
         if not authorised:
-            bot.say(bot.sender.split("!")[0],"You are not authorized.")
+            bot.say(bot.sender.split("!")[0], "You are not authorized.")
             return
         query = 'UPDATE admins SET sender="" WHERE sender=?'
         with bot.get_db() as db:
             cur = db.cursor()
             cur.execute(query, (bot.sender,))
         if cur.rowcount:
-            bot.say(bot.sender.split("!")[0],"Succesfully deauthorized.")
+            bot.say(bot.sender.split("!")[0], "Succesfully deauthorized.")
         else:
-            bot.say(bot.sender.split("!")[0],"Unable to deauthorize.")
+            bot.say(bot.sender.split("!")[0], "Unable to deauthorize.")
         cur.close()
+
 
 class Join(Module):
     def __init__(self, bot, config):
         Module.__init__(self, bot, config)
         self.handler_type = "privmsg"
         self.rule = r"\.join (\#[^ ]+)"
-    
+
     def run(self, bot, params):
         with bot.get_db() as db:
             authorised = is_authorised(db, bot.sender)
         if not authorised:
-            bot.say(bot.sender.split("!")[0],"You are not authorized.")
+            bot.say(bot.sender.split("!")[0], "You are not authorized.")
             return
         bot.msg("JOIN %s" % bot.match.groups()[0])
         bot.say(bot.match.groups()[0], "Hello!")
-        #bot.say(bot.match.groups()[0], "I have been told to join this channel by %s" % params[0])
+
 
 class Part(Module):
     def __init__(self, bot, config):
         Module.__init__(self, bot, config)
         self.handler_type = "privmsg"
         self.rule = r"\.part (\#[^ ]+)"
-    
+
     def run(self, bot, params):
         with bot.get_db() as db:
             authorised = is_authorised(db, bot.sender)
         if not authorised:
-            bot.say(bot.sender.split("!")[0],"You are not authorized.")
+            bot.say(bot.sender.split("!")[0], "You are not authorized.")
             return
         bot.msg("PART %s" % bot.match.groups(0))
+
 
 class Nick(Module):
     def __init__(self, bot, config):
         Module.__init__(self, bot, config)
         self.handler_type = "privmsg"
         self.rule = r"\.nick ([^ ]+)"
-    
+
     def run(self, bot, params):
         with bot.get_db() as db:
             authorised = is_authorised(db, bot.sender)
         if not authorised:
-            bot.say(bot.sender.split("!")[0],"You are not authorized.")
+            bot.say(bot.sender.split("!")[0], "You are not authorized.")
             return
         bot.conf.nick = bot.match.group(0)
         bot.msg("NICK %s" % bot.match.groups(0))
+
 
 class Msg(Module):
     def __init__(self, bot, config):
         Module.__init__(self, bot, config)
         self.handler_type = "privmsg"
         self.rule = r"\.msg (\#[^ ]+)[ ]+([^ ].*)"
-    
+
     def run(self, bot, params):
         with bot.get_db() as db:
             authorised = is_authorised(db, bot.sender)
         if not authorised:
-            bot.say(bot.sender.split("!")[0],"You are not authorized.")
+            bot.say(bot.sender.split("!")[0], "You are not authorized.")
             return
         bot.say(bot.match.group(1), bot.match.group(2))
+
 
 class Send(Module):
     def __init__(self, bot, config):
         Module.__init__(self, bot, config)
         self.handler_type = "privmsg"
         self.rule = r"\.send[ ]+([^ ].*)"
-    
+
     def run(self, bot, params):
         with bot.get_db() as db:
             authorised = is_authorised(db, bot.sender)
         if not authorised:
-            bot.say(bot.sender.split("!")[0],"You are not authorized.")
+            bot.say(bot.sender.split("!")[0], "You are not authorized.")
             return
         bot.msg(bot.match.groups()[0])
+
 
 class Reload(Module):
     def __init__(self, bot, config):
         Module.__init__(self, bot, config)
         self.handler_type = "privmsg"
         self.rule = r"^\.(reload|unload)[ ]+([^ ]+)$"
-    
+
     def run(self, bot, params):
         with bot.get_db() as db:
             authorised = is_authorised(db, bot.sender)
         if not authorised:
-            bot.say(bot.sender.split("!")[0],"You are not authorized.")
+            bot.say(bot.sender.split("!")[0], "You are not authorized.")
             return
         mn = bot.match.groups()[1]
         nick = params[0].split("!")[0]
@@ -184,7 +195,7 @@ class Reload(Module):
             traceback.print_exc()
         else:
             bot.say(nick, "Unloading of module %s SUCCESSFUL!" % mn)
-        if bot.match.groups()[0]=='unload':
+        if bot.match.groups()[0] == 'unload':
             return
         try:
             bot.load_module(mn)
@@ -194,17 +205,18 @@ class Reload(Module):
         else:
             bot.say(nick, "Reloading of module %s SUCCESSFUL!" % mn)
 
+
 class CoreDump(Module):
     def __init__(self, bot, config):
         Module.__init__(self, bot, config)
         self.handler_type = "privmsg"
         self.rule = r"^\.core_dump$"
-    
+
     def run(self, bot, params):
         with bot.get_db() as db:
             authorised = is_authorised(db, bot.sender)
         if not authorised:
-            bot.say(bot.sender.split("!")[0],"You are not authorized.")
+            bot.say(bot.sender.split("!")[0], "You are not authorized.")
             return
         for k in bot.modules:
             print(k)

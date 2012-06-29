@@ -8,6 +8,7 @@ __module_class_names__ = [
 from bot import Module
 import random
 
+
 class Swear(Module):
     def __init__(self, bot, config):
         Module.__init__(self, bot, config)
@@ -26,7 +27,8 @@ class Swear(Module):
         bot.say(bot.target, '{0}: {1}'.format(
             bot.sender.split("!")[0], random.choice(choices)))
 
-class Sing(Module): 
+
+class Sing(Module):
     def __init__(self, bot, config):
         Module.__init__(self, bot, config)
         self.handler_type = "privmsg"
@@ -48,6 +50,7 @@ class Sing(Module):
         if row:
             bot.say(bot.target, '{0}: {1}'.format(
                 bot.sender.split("!")[0], row['lyric']))
+
 
 class Yeah(Module):
     def __init__(self, bot, config):

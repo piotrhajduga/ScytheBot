@@ -1,5 +1,11 @@
 # -*- coding: utf-8 -*-
-__module_class_names__ = ["RememberSaying", "SaySaying","RememberYT","SayYT","Dump"]
+__module_class_names__ = [
+    'RememberSaying',
+    'SaySaying',
+    'RememberYT',
+    'SayYT',
+    'Dump'
+    ]
 
 from bot import Module
 from admin import is_authorised
@@ -9,17 +15,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-CHANCES = {
-        'remember':6,
-        'say':2,
-        'thank':10
-        }
+CHANCES = {'remember': 6, 'say': 2, 'thank': 10}
 CHOICES = (
         "I love you!",
         "<3",
         ":*",
         "you know that I know..."
         )
+
 
 class RememberSaying(Module):
     def __init__(self, bot, config):
@@ -36,28 +39,29 @@ class RememberSaying(Module):
              saying TEXT NOT NULL UNIQUE)'''
         with bot.get_db() as db:
             db.execute(query)
- 
+
     def run(self, bot, params):
-        if random.randint(1,100)>CHANCES['remember']:
+        if random.randint(1, 100) > CHANCES['remember']:
             return
         regexp = r'.*(https?\://).*'
         if re.match(regexp, bot.line):
             return
         regexp = r'[.-_/\\].*'
-        if re.match(regexp,bot.line):
+        if re.match(regexp, bot.line):
             return
-        global sayings 
+        global sayings
         saying = bot.match.groups()[0]
         query = 'INSERT INTO parrot_sayings (saying) VALUES (?)'
         with bot.get_db() as db:
             db.execute(query, (saying,))
-        if random.randint(1,100)<=CHANCES['thank']:
+        if random.randint(1, 100) <= CHANCES['thank']:
             bot.say(bot.target, "Remembered!")
             return
-        if random.randint(1,100)>CHANCES['say']:
+        if random.randint(1, 100) > CHANCES['say']:
             return
         bot.say(bot.target, '{0}: {1}'.format(
             bot.sender.split("!")[0], random.choice(CHOICES)))
+
 
 class SaySaying(Module):
     def __init__(self, bot, config):
@@ -69,7 +73,7 @@ class SaySaying(Module):
         modifier = 0
         if bot.match.group(0) and (bot.config["nick"] in bot.match.group(0)):
             modifier = 34
-        if random.randint(1,100) > (CHANCES['say'] + modifier):
+        if random.randint(1, 100) > (CHANCES['say'] + modifier):
             return
         query = 'SELECT saying FROM parrot_sayings ORDER BY RANDOM() LIMIT 1'
         with bot.get_db() as db:
@@ -77,6 +81,7 @@ class SaySaying(Module):
         if row:
             bot.say(bot.target, '{0}: {1}'.format(
                 bot.sender.split("!")[0], row[0]))
+
 
 class RememberYT(Module):
     def __init__(self, bot, config):
@@ -93,7 +98,7 @@ class RememberYT(Module):
              link TEXT NOT NULL UNIQUE)'''
         with bot.get_db() as db:
             db.execute(query)
- 
+
     def run(self, bot, params):
         link = bot.match.group(1)
         query = 'SELECT * FROM parrot_yt_links WHERE link=?'
@@ -107,13 +112,14 @@ class RememberYT(Module):
         query = 'INSERT INTO parrot_yt_links (link) VALUES (?)'
         with bot.get_db() as db:
             db.execute(query, (link,))
-        if random.randint(1,100)>CHANCES['thank']:
+        if random.randint(1, 100) > CHANCES['thank']:
             return
-        choices = ("I love you!","<3",":*",
+        choices = ("I love you!", "<3", ":*",
                 "you know that I know...",
-                "stupido!","tell me about it",
+                "stupido!", "tell me about it",
                 "I bet you don't know what is going to happen next...")
         bot.say(bot.target, bot.sender.split("!")[0] + ": " + random.choice(choices))
+
 
 class SayYT(Module):
     def __init__(self, bot, config):
@@ -131,6 +137,7 @@ class SayYT(Module):
         bot.say(bot.target, '{0}: {1}'.format(
             bot.sender.split('!')[0], message))
 
+
 class Dump(Module):
     def __init__(self, bot, config):
         Module.__init__(self, bot, config)
@@ -138,7 +145,7 @@ class Dump(Module):
         self.config["thread_timeout"] = 1.0
         self.handler_type = "privmsg"
         self.rule = r'\.dump'
-    
+
     def run(self, bot, params):
         with bot.get_db() as db:
             authorised = is_authorised(db, bot.sender)
