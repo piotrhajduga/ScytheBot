@@ -47,19 +47,23 @@ class Auth(Module):
              nick TEXT NOT NULL,
              sender TEXT,
              pass TEXT NOT NULL)'''
-        bot.get_db().execute(query)
+        with bot.get_db() as db:
+            db.execute(query)
     
     def run(self, bot, params):
-        if is_authorised(bot.get_db(), bot.sender):
+        with bot.get_db() as db:
+            authorised = is_authorised(db, bot.sender)
+        if authorised:
             bot.say(bot.sender.split("!")[0],"You already are authorized.")
             return
         username = bot.match.groups()[0]
         password = bot.match.groups()[1].encode(bot.config["encoding"])
         password = hashlib.md5(password).hexdigest()
         query = 'UPDATE admins SET sender=? WHERE nick=? AND pass=?'
-        bot.get_db().execute(query,
-                (bot.sender, username, password))
-        if is_authorised(bot.get_db(), bot.sender):
+        with bot.get_db() as db:
+            db.execute(query,
+                    (bot.sender, username, password))
+        if authorised:
             bot.say(bot.sender.split("!")[0],"Succesfully authorized.")
         else:
             bot.say(bot.sender.split("!")[0],"Unable to authorize.")
@@ -71,15 +75,20 @@ class Deauth(Module):
         self.rule = r"^\.deauth$"
 
     def run(self, bot, params):
-        if not is_authorised(bot.get_db(), bot.sender):
+        with bot.get_db() as db:
+            authorised = is_authorised(db, bot.sender)
+        if not authorised:
             bot.say(bot.sender.split("!")[0],"You are not authorized.")
             return
         query = 'UPDATE admins SET sender="" WHERE sender=?'
-        bot.get_db().cursor().execute(query, (bot.sender,))
-        if bot.get_db().cursor().rowcount:
+        with bot.get_db() as db:
+            cur = db.cursor()
+            cur.execute(query, (bot.sender,))
+        if cur.rowcount:
             bot.say(bot.sender.split("!")[0],"Succesfully deauthorized.")
         else:
             bot.say(bot.sender.split("!")[0],"Unable to deauthorize.")
+        cur.close()
 
 class Join(Module):
     def __init__(self, bot, config):
@@ -88,7 +97,10 @@ class Join(Module):
         self.rule = r"\.join (\#[^ ]+)"
     
     def run(self, bot, params):
-        if not is_authorised(bot.get_db(), bot.sender):
+        with bot.get_db() as db:
+            authorised = is_authorised(db, bot.sender)
+        if not authorised:
+            bot.say(bot.sender.split("!")[0],"You are not authorized.")
             return
         bot.msg("JOIN %s" % bot.match.groups()[0])
         bot.say(bot.match.groups()[0], "Hello!")
@@ -101,7 +113,10 @@ class Part(Module):
         self.rule = r"\.part (\#[^ ]+)"
     
     def run(self, bot, params):
-        if not is_authorised(bot.sender):
+        with bot.get_db() as db:
+            authorised = is_authorised(db, bot.sender)
+        if not authorised:
+            bot.say(bot.sender.split("!")[0],"You are not authorized.")
             return
         bot.msg("PART %s" % bot.match.groups(0))
 
@@ -112,7 +127,10 @@ class Nick(Module):
         self.rule = r"\.nick ([^ ]+)"
     
     def run(self, bot, params):
-        if not is_authorised(bot.get_db(), bot.sender):
+        with bot.get_db() as db:
+            authorised = is_authorised(db, bot.sender)
+        if not authorised:
+            bot.say(bot.sender.split("!")[0],"You are not authorized.")
             return
         bot.conf.nick = bot.match.group(0)
         bot.msg("NICK %s" % bot.match.groups(0))
@@ -124,7 +142,10 @@ class Msg(Module):
         self.rule = r"\.msg (\#[^ ]+)[ ]+([^ ].*)"
     
     def run(self, bot, params):
-        if not is_authorised(bot.get_db(), bot.sender):
+        with bot.get_db() as db:
+            authorised = is_authorised(db, bot.sender)
+        if not authorised:
+            bot.say(bot.sender.split("!")[0],"You are not authorized.")
             return
         bot.say(bot.match.group(1), bot.match.group(2))
 
@@ -135,7 +156,10 @@ class Send(Module):
         self.rule = r"\.send[ ]+([^ ].*)"
     
     def run(self, bot, params):
-        if not is_authorised(bot.get_db(), bot.sender):
+        with bot.get_db() as db:
+            authorised = is_authorised(db, bot.sender)
+        if not authorised:
+            bot.say(bot.sender.split("!")[0],"You are not authorized.")
             return
         bot.msg(bot.match.groups()[0])
 
@@ -146,7 +170,10 @@ class Reload(Module):
         self.rule = r"^\.(reload|unload)[ ]+([^ ]+)$"
     
     def run(self, bot, params):
-        if not is_authorised(bot.get_db(), bot.sender):
+        with bot.get_db() as db:
+            authorised = is_authorised(db, bot.sender)
+        if not authorised:
+            bot.say(bot.sender.split("!")[0],"You are not authorized.")
             return
         mn = bot.match.groups()[1]
         nick = params[0].split("!")[0]
@@ -174,7 +201,10 @@ class CoreDump(Module):
         self.rule = r"^\.core_dump$"
     
     def run(self, bot, params):
-        if not is_authorised(bot.get_db(), bot.sender):
+        with bot.get_db() as db:
+            authorised = is_authorised(db, bot.sender)
+        if not authorised:
+            bot.say(bot.sender.split("!")[0],"You are not authorized.")
             return
         for k in bot.modules:
             print(k)

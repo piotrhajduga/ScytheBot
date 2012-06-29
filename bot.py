@@ -4,6 +4,7 @@ import pkgutil
 import re
 import time
 import sqlite3
+from contextlib import contextmanager
 from threading import Timer
 from threading2 import Thread
 
@@ -93,7 +94,6 @@ class Module(object):
 
 class Bot(irc.IRC):
     modules = dict()  # { "type" : ("pack_name", "regexp", "module") }
-    db = None
 
     def __init__(self, config):
         irc.IRC.__init__(self, config)
@@ -112,15 +112,14 @@ class Bot(irc.IRC):
         self.modules["kick"] = list()
         self.load_modules()
 
+    @contextmanager
     def get_db(self):
-        if not self.db:
-            self.db = sqlite3.connect(self.config["modules_database_path"])
-            self.db.isolation_level = None
-        return self.db
+        db = sqlite3.connect(self.config["modules_database_path"])
+        yield db
+        db.commit()
+        db.close()
 
     def close(self):
-        if self.db:
-            self.db.close()
         irc.IRC.close(self)
 
     def load_modules(self):

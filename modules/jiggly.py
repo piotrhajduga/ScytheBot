@@ -38,11 +38,13 @@ class Sing(Module):
         query = '''CREATE TABLE IF NOT EXISTS sing
             (id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL,
              lyric TEXT NOT NULL)'''
-        bot.get_db().cursor().execute(query)
+        with bot.get_db() as db:
+            db.execute(query)
 
     def run(self, bot, params):
         query = 'SELECT lyric FROM sing ORDER BY RANDOM() LIMIT 1'
-        row = bot.get_db().execute(query).fetchone()
+        with bot.get_db() as db:
+            row = db.execute(query).fetchone()
         if row:
             bot.say(bot.target, '{0}: {1}'.format(
                 bot.sender.split("!")[0], row['lyric']))
