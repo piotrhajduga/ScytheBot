@@ -66,7 +66,7 @@ def run_in_background(timeout=None):
                 logger.debug('Stopping thread %s', thread)
                 thread.terminate()
 
-            if timeout != None:
+            if timeout is not None:
                 timer = Timer(timeout, stop)
                 timer.start()
 
@@ -97,13 +97,13 @@ class Bot(irc.IRC):
 
     def __init__(self, config):
         irc.IRC.__init__(self, config)
-        from os.path import expanduser,expandvars
+        from os.path import expanduser, expandvars
         self.config["modules_paths"] = [expanduser(expandvars(path))
-                for path in config.modules_paths]
-        self.config["modules_database_path"] = \
-                expanduser(expandvars(config.modules_database_path))
+                                        for path in config.modules_paths]
+        self.config["modules_database_path"] = expanduser(
+            expandvars(config.modules_database_path))
         logger.debug('Modules database path = %s',
-                self.config["modules_database_path"])
+                     self.config["modules_database_path"])
         self.config["load_modules"] = config.load_modules
         self.config["block_modules"] = config.block_modules
         self.config["channels"] = config.channels
@@ -124,7 +124,7 @@ class Bot(irc.IRC):
 
     def load_modules(self):
         logger.debug('Loading modules from directories:\n%s',
-                self.config["modules_paths"])
+                     self.config["modules_paths"])
         for (importer, name, ispkg) in \
                 pkgutil.iter_modules(self.config["modules_paths"]):
             logger.debug('Checking module: %s', name)
@@ -138,8 +138,7 @@ class Bot(irc.IRC):
             else:
                 logger.debug('Module not marked to be loaded: %s', name)
 
-    def load_module_with_importer(self, importer, pack_name, \
-            load_modules=None):
+    def load_module_with_importer(self, importer, pack_name, load_modules=None):
         logger.debug('Loading modules from pack: %s', pack_name)
         loader = importer.find_module(pack_name)
         module_pack = loader.load_module(pack_name)
@@ -150,8 +149,8 @@ class Bot(irc.IRC):
                 module = getattr(module_pack, module_name)
                 try:
                     logger.debug('Trying: %s', module)
-                    obj = module(self, self.prepare_module_config( \
-                            getattr(module_pack, '__module_config__', {})))
+                    obj = module(self, self.prepare_module_config(
+                        getattr(module_pack, '__module_config__', {})))
                     if obj:
                         mdl = (pack_name, re.compile(obj.rule), obj)
                         if not hasattr(obj, "handler_type"):
@@ -160,26 +159,26 @@ class Bot(irc.IRC):
                             self.modules[obj.handler_type] = list()
                         self.modules[obj.handler_type].insert(0, mdl)
                 except BaseException:
-                    logger.exception('Cannot load %s from %s', \
-                            module_name, pack_name)
+                    logger.exception('Cannot load %s from %s',
+                                     module_name, pack_name)
 
     def load_module(self, pack_name, load_modules=None):
         modules = filter(lambda m: m[1] == pack_name,
-                pkgutil.iter_modules(self.config["modules_paths"]))
+                         pkgutil.iter_modules(self.config["modules_paths"]))
         for (importer, name, ispkg) in modules:
             try:
-                self.load_module_with_importer(importer, name, \
-                        load_modules=load_modules)
+                self.load_module_with_importer(importer, name,
+                                               load_modules=load_modules)
             except BaseException:
                 logger.exception('Cannot load %s', name)
 
     def unload_module(self, pack_name, module_name=None):
         modules = list()
         for k in self.modules:
-            modules.extend(filter(lambda m: m[0] == pack_name \
-                    and (module_name == None \
-                    or m[2].__class__.__name__ == module_name), \
-                    self.modules[k]))
+            modules.extend(filter(lambda m: m[0] == pack_name
+                           and (module_name is not None
+                           or m[2].__class__.__name__ == module_name),
+                           self.modules[k]))
         for mdl in modules:
             logger.info('Unloading %s.%s', mdl[0], mdl[2])
             self.modules[mdl[2].handler_type].remove(mdl)
@@ -190,7 +189,7 @@ class Bot(irc.IRC):
         for key in config:
             if not isinstance(config[key][0], config[key][1]):
                 raise ConfigException('config option %s needs %s, but %s given'
-                        % (key, config[key][1], config[key][0]))
+                                      % (key, config[key][1], config[key][0]))
             else:
                 prepared[key] = config[key][0]
         return prepared
@@ -209,6 +208,8 @@ class Bot(irc.IRC):
             mdl[2].run(obj, (cmd, params))
 
     def handle_privmsg(self, sender, target, msg):
+        if not msg:
+            return
         dont_do = list()
         for mdl in self.modules["privmsg"]:
             if mdl in dont_do:
