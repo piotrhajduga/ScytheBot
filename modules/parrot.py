@@ -7,12 +7,12 @@ __module_class_names__ = [
     'Dump'
 ]
 
+import logging
+import random
+import re
+import sqlite3
 from bot import Module
 from modules.admin import is_authorised
-import re
-import random
-import logging
-import sqlite3
 
 logger = logging.getLogger(__name__)
 

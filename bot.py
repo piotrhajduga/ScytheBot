@@ -10,9 +10,15 @@ from threading import Timer, Thread
 logger = logging.getLogger(__name__)
 
 
-class Wrapper(object):
+class WrappedBot(object):
     def __init__(self, origobj):
         self.obj = origobj
+        self.sender = None
+        self.target = None
+        self.line = None
+        self.match = None
+        self.cmd = None
+        self.params = None
 
     def __str__(self):
         return "Wrapped: " + str(self.obj)
@@ -124,11 +130,14 @@ class Bot(irc.IRC):
     def load_modules(self):
         logger.debug('Loading modules from directories:\n%s',
                      self.config["modules_paths"])
-        for (importer, name, ispkg) in \
-                pkgutil.iter_modules(self.config["modules_paths"]):
+        paths = self.config["modules_paths"]
+        modules = {
+            'load': self.config["load_modules"],
+            'block': self.config['block_modules'],
+        }
+        for (importer, name, _) in pkgutil.iter_modules(paths):
             logger.debug('Checking module: %s', name)
-            if name in self.config["load_modules"] \
-                    and name not in self.config["block_modules"]:
+            if name in modules['load'] and name not in modules['block']:
                 try:
                     self.load_module_with_importer(importer, name)
                     logger.debug('Loaded module: %s', name)
@@ -164,7 +173,7 @@ class Bot(irc.IRC):
     def load_module(self, pack_name, load_modules=None):
         modules = filter(lambda m: m[1] == pack_name,
                          pkgutil.iter_modules(self.config["modules_paths"]))
-        for (importer, name, ispkg) in modules:
+        for (importer, name, _) in modules:
             try:
                 self.load_module_with_importer(importer, name,
                                                load_modules=load_modules)
@@ -183,7 +192,8 @@ class Bot(irc.IRC):
             self.modules[mdl[2].handler_type].remove(mdl)
             mdl[2].unload()
 
-    def prepare_module_config(self, config):
+    @staticmethod
+    def prepare_module_config(config):
         prepared = {}
         for key in config:
             if not isinstance(config[key][0], config[key][1]):
@@ -199,7 +209,7 @@ class Bot(irc.IRC):
             if match is None:
                 continue
             logger.debug("Matching module: %s" % mdl[2].__class__)
-            obj = Wrapper(self)
+            obj = WrappedBot(self)
             obj.sender = sender
             obj.cmd = cmd
             obj.params = params
@@ -218,7 +228,7 @@ class Bot(irc.IRC):
             if match is None:
                 continue
             logger.debug("Matching module: %s" % mdl[2].__class__)
-            obj = Wrapper(self)
+            obj = WrappedBot(self)
             obj.sender = sender
             obj.target = target
             obj.line = msg

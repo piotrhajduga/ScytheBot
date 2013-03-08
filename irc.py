@@ -53,11 +53,13 @@ class IRC(object):
             logger.info("Connected to %s:%s", self.config["host"], self.config["port"])
             if self.config["password"]:
                 self.msg("PASS %s" % self.config["password"])
-            logger.info("Identifying as %s (user:%s,name:%s)", \
-                    self.config["nick"], self.config["ident"], self.config["name"])
+            logger.info(
+                "Identifying as %s (user:%s,name:%s)",
+                self.config["nick"], self.config["ident"], self.config["name"])
             self.msg("NICK %s" % self.config["nick"])
-            self.msg("USER %s %s %s :%s" % (self.config["ident"], \
-                    self.config["host"], self.config["nick"], self.config["name"]))
+            self.msg(
+                "USER %s %s %s :%s" % (self.config["ident"],
+                self.config["host"], self.config["nick"], self.config["name"]))
         except socket.error:
             logger.exception('Error connecting to the socket')
             raise ConnectionFailureException()

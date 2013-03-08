@@ -1,7 +1,7 @@
 __module_class_names__ = ["Hello", "Interjection", "Ahello"]
 
-from bot import Module
 import random
+from bot import Module
 
 
 def hello():

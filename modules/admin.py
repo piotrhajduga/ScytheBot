@@ -1,24 +1,30 @@
 # -*- coding: utf-8 -*-
 __module_class_names__ = [
-        "Auth",
-        "Deauth",
-        "Autojoin",
-        "Join",
-        "Part",
-        "Nick",
-        "Send",
-        "Msg",
-        "Reload",
-        "CoreDump",
-        ]
+    "Auth", "Deauth",
+    "Autojoin", "Join", "Part",
+    "Nick",
+    "Send",
+    "Msg",
+    "Reload",
+    "CoreDump",
+]
 
-from bot import Module
-import traceback
 import hashlib
 import logging
+from bot import Module
 from contextlib import closing
 
 logger = logging.getLogger(__name__)
+
+
+def create_tables(bot):
+    query = '''CREATE TABLE IF NOT EXISTS admins
+        (id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL,
+            nick TEXT NOT NULL,
+            sender TEXT,
+            pass TEXT NOT NULL)'''
+    with bot.get_db() as db:
+        db.execute(query)
 
 
 def is_authorised(db, sender):
@@ -44,16 +50,7 @@ class Auth(Module):
         Module.__init__(self, bot, config)
         self.handler_type = "privmsg"
         self.rule = r"^\.auth[ ]+([^ ]+)[ ]+([^ ]+)$"
-        self.create_tables(bot)
-
-    def create_tables(self, bot):
-        query = '''CREATE TABLE IF NOT EXISTS admins
-            (id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL,
-             nick TEXT NOT NULL,
-             sender TEXT,
-             pass TEXT NOT NULL)'''
-        with bot.get_db() as db:
-            db.execute(query)
+        create_tables(bot)
 
     def run(self, bot, params):
         with bot.get_db() as db:
@@ -66,8 +63,7 @@ class Auth(Module):
         password = hashlib.md5(password).hexdigest()
         query = 'UPDATE admins SET sender=? WHERE nick=? AND pass=?'
         with bot.get_db() as db:
-            db.execute(query,
-                    (bot.sender, username, password))
+            db.execute(query, (bot.sender, username, password))
         if authorised:
             bot.say(bot.sender.split("!")[0], "Succesfully authorized.")
         else:
@@ -190,18 +186,18 @@ class Reload(Module):
         nick = params[0].split("!")[0]
         try:
             bot.unload_module(mn)
-        except:
+        except Exception as exc:
+            logger.exception(str(exc))
             bot.say(nick, "Unloading of module %s FAILED!" % mn)
-            traceback.print_exc()
         else:
             bot.say(nick, "Unloading of module %s SUCCESSFUL!" % mn)
         if bot.match.groups()[0] == 'unload':
             return
         try:
             bot.load_module(mn)
-        except:
+        except Exception as exc:
+            logger.exception(str(exc))
             bot.say(nick, "Reloading of module %s FAILED!" % mn)
-            traceback.print_exc()
         else:
             bot.say(nick, "Reloading of module %s SUCCESSFUL!" % mn)
 
