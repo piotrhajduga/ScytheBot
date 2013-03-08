@@ -2,7 +2,8 @@
 __module_class_names__ = ['Roll']
 
 from bot import Module
-import random, os.path
+import random
+
 
 class Roll(Module):
     def __init__(self, bot, config):
@@ -16,9 +17,9 @@ class Roll(Module):
         except:
             n = 1
         d = int(bot.match.groups()[2])
-        if n>20 or d>100:
+        if n > 20 or d > 100:
             bot.say(bot.target, bot.sender.split("!")[0] + ": cannot handle these numbers, sorry bro... :(")
             return
-        roll = "%dd%d" % (n,d)
-        result = ", ".join(["%d" % random.randint(1,d) for i in range(n)])
-        bot.say(bot.target, roll + ": " + result )
+        roll = '%dd%d' % (n, d)
+        result = ', '.join(['%d' % random.randint(1, d) for i in range(n)])
+        bot.say(bot.target, '{0}: {1}'.format(roll, result))

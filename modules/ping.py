@@ -1,19 +1,20 @@
-# -*- coding: utf-8 -*-
-__module_class_names__ = ["Hello", "Interjection","Ahello"]
+__module_class_names__ = ["Hello", "Interjection", "Ahello"]
 
 from bot import Module
 import random
 
+
 def hello():
     greetings = (
-            'jiiigglypuffff...',
-            'jiggly!',
-            'JIGGLYPUFF!',
-            'JiGgLyPuFfIiIii',
-            'Hey! Hi! Hello!',
-            'Have a nice day!'
-            )
+        #'jiiigglypuffff...',
+        #'jiggly!',
+        #'JIGGLYPUFF!',
+        #'JiGgLyPuFfIiIii',
+        'Hey! Hi! Hello!',
+        'Have a nice day!',
+    )
     return random.choice(greetings)
+
 
 class Hello(Module):
     def __init__(self, bot, config):
@@ -24,14 +25,16 @@ class Hello(Module):
     def run(self, bot, params):
         bot.say(bot.target, hello())
 
-class Interjection(Module): 
+
+class Interjection(Module):
     def __init__(self, bot, config):
         Module.__init__(self, bot, config)
         self.handler_type = "privmsg"
-        self.rule = r'(?i)(%s[:,] *)?(%s|jiggly)(!+).*' % (bot.config["nick"],bot.config["nick"])
+        self.rule = r'(?i)(%s[:,] *)?(%s|jiggly)(!+).*' % (bot.config["nick"], bot.config["nick"])
 
     def run(self, bot, params):
         bot.say(bot.target, hello())
+
 
 class Ahello(Module):
     def __init__(self, bot, config):
