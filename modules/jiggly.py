@@ -79,7 +79,8 @@ class Sing(Module):
         with bot.get_db() as db:
             db.row_factory = sqlite3.Row
             row = db.execute(query).fetchone()
-            bot.say(bot.target, row['lyric'])
+            if row is not None:
+                bot.say(bot.target, row['lyric'])
 
 
 class Yeah(Module):
