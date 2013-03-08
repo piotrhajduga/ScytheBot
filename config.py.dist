@@ -4,11 +4,11 @@ nick = "scythebot"
 ident = "scythebot"
 name = "scythebot pythonic IRC bot in development"
 nickserv_passwd = None
-host = "euroserv.fr.quakenet.org"
+host = "host"
 port = 6667
 ssl = False
 channels = [
-    "#lobos",
+    "#channel",
 ]
 autorejoin = True
 encoding = "utf-8"
