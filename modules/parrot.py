@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 __module_class_names__ = [
-    'ChancesDown', 'ChancesUp',
+    'RememberLess', 'RememberMore',
+    'TalkLess', 'TalkMore',
     'RememberSaying', 'SaySaying',
     'RememberYT', 'SayYT',
     'Dump'
@@ -47,7 +48,40 @@ def query_data(bot, query):
             cur.close()
 
 
-class ChancesDown(Module):
+class RememberLess(Module):
+    def __init__(self, bot, config):
+        Module.__init__(self, bot, config)
+        self.config["threadable"] = True
+        self.config["thread_timeout"] = 1.0
+        self.handler_type = "privmsg"
+        self.rule = r'%s[:,].*?(remember|pami[ęe]taj).*(mniej|less).*' % bot.config["nick"]
+
+    def run(self, bot, params):
+        key = 'remember'
+        CHANCES[key] = random.randint(1, CHANCES[key])
+        logger.info('CHANCES[%s] lowered to: %d', key, CHANCES[key])
+        bot.say(bot.target, "I won't be remembering so much from now on")
+
+
+class RememberMore(Module):
+    def __init__(self, bot, config):
+        Module.__init__(self, bot, config)
+        self.config["threadable"] = True
+        self.config["thread_timeout"] = 1.0
+        self.handler_type = "privmsg"
+        self.rule = r'%s[:,].*?(remember|pami[ęe]taj).*(wi[ęe]cej|more).*' % bot.config["nick"]
+
+    def run(self, bot, params):
+        key = 'remember'
+        CHANCES[key] = random.randint(
+            CHANCES[key],
+            random.randint(CHANCES[key], 100)
+        )
+        logger.info('CHANCES[%s]: %d', key, CHANCES[key])
+        bot.say(bot.target, "More things stay in my memory from now")
+
+
+class TalkLess(Module):
     def __init__(self, bot, config):
         Module.__init__(self, bot, config)
         self.config["threadable"] = True
@@ -56,13 +90,13 @@ class ChancesDown(Module):
         self.rule = r'%s[:,].*?(talk|m[óo]w|speak).*(mniej|less).*' % bot.config["nick"]
 
     def run(self, bot, params):
-        for key in CHANCES:
+        for key in ['say', 'thank']:
             CHANCES[key] = random.randint(1, CHANCES[key])
         logger.info('CHANCES lowered to: %s', CHANCES)
         bot.say(bot.target, "ok... I'll keep it down...")
 
 
-class ChancesUp(Module):
+class TalkMore(Module):
     def __init__(self, bot, config):
         Module.__init__(self, bot, config)
         self.config["threadable"] = True
@@ -71,7 +105,7 @@ class ChancesUp(Module):
         self.rule = r'%s[:,].*?(talk|m[óo]w|speak).*(wi[ęe]cej|more).*' % bot.config["nick"]
 
     def run(self, bot, params):
-        for key in CHANCES:
+        for key in ['say', 'thank']:
             CHANCES[key] = random.randint(
                 CHANCES[key],
                 random.randint(CHANCES[key], 100)
