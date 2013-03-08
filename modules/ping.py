@@ -1,4 +1,4 @@
-__module_class_names__ = ["Hello", "Interjection","Ahello"]
+__module_class_names__ = ["Hello", "Interjection", "Ahello"]
 
 from bot import Module
 import random
@@ -6,13 +6,13 @@ import random
 
 def hello():
     greetings = (
-            'jiiigglypuffff...',
-            'jiggly!',
-            'JIGGLYPUFF!',
-            'JiGgLyPuFfIiIii',
-            'Hey! Hi! Hello!',
-            'Have a nice day!'
-            )
+        #'jiiigglypuffff...',
+        #'jiggly!',
+        #'JIGGLYPUFF!',
+        #'JiGgLyPuFfIiIii',
+        'Hey! Hi! Hello!',
+        'Have a nice day!',
+    )
     return random.choice(greetings)
 
 
