@@ -2,13 +2,14 @@
 __module_class_names__ = [
     'Swear',
     'Sing',
-    'Song',
+    'RememberSong',
     'Yeah'
 ]
 
-from bot import Module
-import random
 import logging
+import random
+import sqlite3
+from bot import Module
 from modules.admin import is_authorised
 
 logger = logging.getLogger(__name__)
@@ -42,13 +43,13 @@ class Swear(Module):
             bot.sender.split("!")[0], random.choice(choices)))
 
 
-class Song(Module):
+class RememberSong(Module):
     def __init__(self, bot, config):
         Module.__init__(self, bot, config)
         self.config["threadable"] = True
         self.config["thread_timeout"] = 1.0
         self.handler_type = "privmsg"
-        self.rule = r'%s[:,].*?(?:remember song|pami[ęe]taj piosenk[ęe]) *(.*)'
+        self.rule = r'%s[:,] *?(?:remember song|pami[ęe]taj piosenk[ęe]) *(.*)' % bot.config['nick']
         create_tables(bot)
 
     def run(self, bot, params):
@@ -58,6 +59,7 @@ class Song(Module):
             logger.warn("Unauthorized attempt to teach a lyric")
             return
         query = 'INSERT INTO sing (lyric) VALUES (?)'
+        logger.debug('groups: %s', bot.match.groups())
         lyric = bot.match.groups()[0].strip()
         with bot.get_db() as db:
             db.execute(query, (lyric,))
@@ -75,8 +77,8 @@ class Sing(Module):
     def run(self, bot, params):
         query = 'SELECT lyric FROM sing ORDER BY RANDOM() LIMIT 1'
         with bot.get_db() as db:
+            db.row_factory = sqlite3.Row
             row = db.execute(query).fetchone()
-        if row:
             bot.say(bot.target, row['lyric'])
 
 
