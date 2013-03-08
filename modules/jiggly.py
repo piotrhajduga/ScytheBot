@@ -2,6 +2,7 @@
 __module_class_names__ = [
     'Swear',
     'Sing',
+    'Song',
     'Yeah'
 ]
 
