@@ -2,4 +2,6 @@ __pycache__/
 py*/
 *~
 *.pyc
+*.sqlite
+*.sqlite3
 tags
