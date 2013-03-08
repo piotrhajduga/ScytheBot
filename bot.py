@@ -5,8 +5,7 @@ import re
 import time
 import sqlite3
 from contextlib import contextmanager
-from threading import Timer
-from threading2 import Thread
+from threading import Timer, Thread
 
 logger = logging.getLogger(__name__)
 
