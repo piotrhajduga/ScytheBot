@@ -11,6 +11,7 @@ from modules.admin import is_authorised
 import re
 import random
 import logging
+import sqlite3
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,17 @@ def create_tables(bot):
             (id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL,
                 saying TEXT NOT NULL UNIQUE)'''
         db.execute(query)
+
+
+def query_data(bot, query):
+    with bot.get_db() as db:
+        db.row_factory = sqlite3.Row
+        cur = db.cursor()
+        try:
+            cur.execute(query)
+            return cur.fetchall()
+        finally:
+            cur.close()
 
 
 class ChancesDown(Module):
@@ -130,11 +142,10 @@ class RememberYT(Module):
 
     def run(self, bot, params):
         link = bot.match.group(1)
-        query = 'SELECT * FROM parrot_yt_links WHERE link=?'
+        query = 'SELECT * FROM parrot_yt_links WHERE link=? LIMIT 1'
         with bot.get_db() as db:
             cur = db.cursor()
-            cur.execute(query, (link,))
-            rowcount = cur.rowcount
+            rowcount = len(cur.execute(query, (link,)).fetchall())
             cur.close()
         if rowcount:
             return
@@ -175,6 +186,7 @@ class Dump(Module):
         self.config["thread_timeout"] = 1.0
         self.handler_type = "privmsg"
         self.rule = r'\.dump'
+        create_tables(bot)
 
     def run(self, bot, params):
         with bot.get_db() as db:
@@ -182,14 +194,17 @@ class Dump(Module):
         if not authorised:
             logger.warn("Unauthorized attempt to dump the database")
             return
-        with bot.get_db() as db:
-            query = 'SELECT * FROM parrot_sayings'
-            sayings = db.execute(query).fetchall()
-            query = 'SELECT * FROM parrot_yt_links'
-            yt_links = db.execute(query).fetchall()
+        sender = bot.sender.split('!', 1)[0]
         logger.info("yt_links:")
-        for link in yt_links:
-            logger.info("%d: %s", link['id'], link['link'])
+        query = 'SELECT * FROM parrot_yt_links'
+        yt_links = query_data(bot, query)
+        bot.say(sender, '%d links to youtube' % len(yt_links))
+        for row in yt_links:
+            logger.debug(row.keys())
+            logger.info("%d: %s", row['id'], row['link'])
         logger.info("sayings:")
-        for saying in sayings:
-            logger.info("%d: %s", saying['id'], saying['saying'])
+        query = 'SELECT * FROM parrot_sayings'
+        sayings = query_data(bot, query)
+        bot.say(sender, '%d sayings' % len(sayings))
+        for row in sayings:
+            logger.info("%d: %s", row['id'], row['saying'])
