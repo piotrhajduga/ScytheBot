@@ -80,7 +80,7 @@ class IRC(asynchat.async_chat):
         pass
 
     def cmd(self, msg):
-        msg = (' :' if ' ' in str(msg[-1]) else ' ').join([
+        msg = ' :'.join([
             ' '.join(map(lambda s: str(s).replace(' ', ''), msg[:-1])),
             str(msg[-1])
         ])

@@ -7,6 +7,7 @@ import socket
 import sqlite3
 import time
 from contextlib import contextmanager
+from exc import ConfigException
 from threading import Thread, Timer
 
 logger = logging.getLogger(__name__)
@@ -29,33 +30,6 @@ class WrappedBot(object):
         return getattr(self.obj, attr)
 
 
-class ConfigException(BaseException):
-    pass
-
-
-def noop(*args, **kwargs):
-    pass
-
-
-def run_per_minute(max_runs_per_m, run_if_too_often):
-    def decorate(func):
-        def run(*args, **kwargs):
-            if run.__last_minute == int(time.time()) / 60:
-                run.__runs_last_minute += 1
-                if max_runs_per_m >= run.__runs_last_minute:
-                    return func(*args, **kwargs)
-                else:
-                    return run_if_too_often(*args, **kwargs)
-            else:
-                run.__runs_last_minute = 0
-                run.__last_minute = int(time.time()) / 60
-                return func(*args, **kwargs)
-        run.__last_minute = time.time()
-        run.__runs_last_minute = 0
-        return run
-    return decorate
-
-
 def run_in_background(timeout=None):
     def decorate(func):
         def run(*args, **kwargs):
@@ -76,7 +50,6 @@ def run_in_background(timeout=None):
             if timeout is not None:
                 timer = Timer(timeout, stop)
                 timer.start()
-
             thread.start()
             return thread
         return run
@@ -112,6 +85,41 @@ class Bot(object):
         self.load_modules()
         self.irc = None
 
+    def handle_privmsg(self, _irc, prefix, command, params):
+        nick = prefix.split('!', 1)[0]
+        msg = params[-1]
+        channel = params[0]
+        if not msg:
+            return
+        dont_do = list()
+        for mdl in self.modules["privmsg"]:
+            if mdl in dont_do:
+                return
+            dont_do.append(mdl)
+            match = mdl[1].match(msg)
+            if match is None:
+                continue
+            logger.debug("Matching module: %s" % mdl[2].__class__)
+            obj = WrappedBot(self)
+            obj.sender = nick
+            obj.target = channel
+            obj.line = msg
+            obj.match = match
+            if mdl[2].config['threadable']:
+                timeout = mdl[2].config['thread_timeout']
+                run_in_background(timeout)(mdl[2].run)(obj, (nick, msg))
+            else:
+                mdl[2].run(obj, (nick, msg))
+
+    def handle_notice(self, _irc, prefix, command, params):
+        logger.debug('(prefix, command, params): %s)', (prefix, command, params))
+        if prefix == self.config['host'] and params[0] == self.config['nick']:
+            for chan in self.config['channels']:
+                self.irc.cmd(['JOIN', chan])
+
+    def say(self, target, msg):
+        self.irc.cmd(['PRIVMSG', target, msg])
+
     def connect(self):
         cfg = self.config
         self.irc = irc.IRC(
@@ -125,7 +133,6 @@ class Bot(object):
         )
         self.irc.handlers['PRIVMSG'] = self.handle_privmsg
         self.irc.handlers['NOTICE'] = self.handle_notice
-        self.irc.handlers['KICK'] = self.handle_kick
 
     def main(self):
         while True:
@@ -225,44 +232,6 @@ class Bot(object):
             else:
                 prepared[key] = config[key][0]
         return prepared
-
-    def handle_kick(self, _irc, prefix, command, params):
-        pass
-
-    def handle_privmsg(self, _irc, prefix, command, params):
-        nick = prefix.split('!', 1)[0]
-        msg = params[-1]
-        channel = params[0]
-        if not msg:
-            return
-        dont_do = list()
-        for mdl in self.modules["privmsg"]:
-            if mdl in dont_do:
-                return
-            dont_do.append(mdl)
-            match = mdl[1].match(msg)
-            if match is None:
-                continue
-            logger.debug("Matching module: %s" % mdl[2].__class__)
-            obj = WrappedBot(self)
-            obj.sender = nick
-            obj.target = channel
-            obj.line = msg
-            obj.match = match
-            if mdl[2].config['threadable']:
-                timeout = mdl[2].config['thread_timeout']
-                run_in_background(timeout)(mdl[2].run)(obj, (nick, msg))
-            else:
-                mdl[2].run(obj, (nick, msg))
-
-    def handle_notice(self, _irc, prefix, command, params):
-        logger.debug('(prefix, command, params): %s)', (prefix, command, params))
-        if prefix == self.config['host'] and params[0] == self.config['nick']:
-            for chan in self.config['channels']:
-                self.irc.cmd(['JOIN', chan])
-
-    def say(self, target, msg):
-        self.irc.cmd(['PRIVMSG', target, msg])
 
     def set_config(self, conf):
         essentials = ('host', 'port', 'nick', 'realname')
