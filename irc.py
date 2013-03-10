@@ -1,144 +1,109 @@
+import asynchat
 import logging
+import re
 import socket
 import ssl
-import re
+from itertools import chain
 
 logger = logging.getLogger(__name__)
 
 
-class LostConnectionException(BaseException):
-    def __str__(self):
-        return "Disconnected!"
+class IRC(asynchat.async_chat):
+    patterns = {
+        'cmd': re.compile('^\:([^ ]+)[ ]+([^ ]+)[ ]+\:?([^ ].*)?$'),
+        'privmsg': re.compile('^\:([^ ]+)[ ]+PRIVMSG[ ]+([^ ]+)[ ]+\:?([^ ].*)?$'),
+        'kick': re.compile('^\:([^ ]+)[ ]+KICK[ ]+\:?([^ ].*)?$'),
+        'ping': re.compile('^PING[ ]+\:?([^ ].*)?$'),
+    }
 
+    def __init__(self, server, port, nick, realname, password=None,
+                 use_ssl=False, encoding='utf-8'):
+        self.encoding = encoding
+        self.nick = nick
+        sock = IRC._init_socket(server, port, use_ssl)
+        asynchat.async_chat.__init__(self, sock=sock)
+        self._authenticate(nick, realname, password)
+        self.ibuffer = []
+        self.set_terminator(b'\r\n')
 
-class ConnectionFailureException(Exception):
-    pass
+    @staticmethod
+    def _init_socket(server, port, use_ssl=False):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if use_ssl:
+            sock = ssl.wrap_socket(sock)
+        sock.connect((server, port))
+        logger.info('Connected to %s:%s', server, port)
+        return sock
 
+    def _authenticate(self, nick, realname, password):
+        if password:
+            self.cmd(['PASS', password])
+        logger.info(
+            "Identifying as %s (user:%s,name:%s)",
+            nick, 0, realname
+        )
+        self.cmd(['NICK', nick])
+        self.cmd(['USER', nick, 0, '*', realname])
 
-class BadConfigurationException(Exception):
-    pass
+    def collect_incoming_data(self, data):
+        self.ibuffer.append(data)
 
-
-class IRC(object):
-    def __init__(self, config):
-        self.connected = False
-        self.buffer = str()
-        self.irc = None
-        self.config = None
-        self.set_config(config)
-        self.patterns = dict()
-        self.dispatcher_prepare()
-
-    def set_config(self, config):
-        self.config = dict()
-        try:
-            self.config["host"] = config.host
-            self.config["port"] = config.port or 6667
-            self.config["ssl"] = config.ssl
-            self.config["nick"] = config.nick
-            self.config["ident"] = config.ident
-            self.config["name"] = config.name
-            self.config["password"] = config.password
-            self.config["encoding"] = config.encoding or "utf-8"
-        except Exception:
-            logger.error('Bad configuration')
-            raise BadConfigurationException()
-
-    def connect(self):
-        try:
-            self.irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            if self.config["ssl"]:
-                self.irc = ssl.wrap_socket(self.irc)
-            self.irc.connect((self.config["host"], self.config["port"]))
-            logger.info("Connected to %s:%s", self.config["host"], self.config["port"])
-            if self.config["password"]:
-                self.msg("PASS %s" % self.config["password"])
-            logger.info(
-                "Identifying as %s (user:%s,name:%s)",
-                self.config["nick"], self.config["ident"], self.config["name"])
-            self.msg("NICK %s" % self.config["nick"])
-            self.msg(
-                "USER %s %s %s :%s" % (self.config["ident"],
-                self.config["host"], self.config["nick"], self.config["name"]))
-        except socket.error:
-            logger.exception('Error connecting to the socket')
-            raise ConnectionFailureException()
-
-    def dispatcher_prepare(self):
-        self.patterns["cmd"] = r"^\:([^ ]+)[ ]+([^ ]+)[ ]+\:?([^ ].*)?$"
-        self.patterns["privmsg"] = r"^\:([^ ]+)[ ]+PRIVMSG[ ]+([^ ]+)[ ]+\:?([^ ].*)?$"
-        self.patterns["kick"] = r"^\:([^ ]+)[ ]+KICK[ ]+\:?([^ ].*)?$"
-        self.patterns["ping"] = r"^PING[ ]+\:?([^ ].*)?$"
-        for ptrn in self.patterns:
-            self.patterns[ptrn] = re.compile(self.patterns[ptrn])
+    def found_terminator(self):
+        line = b''.join(self.ibuffer).decode(self.encoding, 'replace')
+        self.dispatch(line)
 
     def dispatch(self, msg):
-        match = self.patterns["cmd"].match(msg)
+        match = self.patterns['cmd'].match(msg)
         if match:
             sender = match.groups()[0]
             cmd = match.groups()[1]
             params = match.groups()[2]
             self.handle_cmd(sender, cmd, params)
-        match = self.patterns["privmsg"].match(msg)
+        match = self.patterns['privmsg'].match(msg)
         if match:
             sender = match.groups()[0]
             target = match.groups()[1]
             params = match.groups()[2]
             self.handle_privmsg(sender, target, params)
             return
-        match = self.patterns["kick"].match(msg)
+        match = self.patterns['kick'].match(msg)
         if match:
             params = match.groups()[1]
             self.handle_kick(params)
             return
-        match = self.patterns["ping"].match(msg)
+        match = self.patterns['ping'].match(msg)
         if match:
             params = match.groups()[0]
             self.handle_ping(params)
             return
 
-    def main_loop(self):
-        while 1:
-            try:
-                read = self.irc.recv(512)
-                if not read:
-                    raise LostConnectionException()
-                self.buffer = self.buffer + read.decode(self.config["encoding"])
-                temp = self.buffer.split("\n")
-                self.buffer = temp.pop()
-                for line in temp:
-                    line = line.rstrip()
-                    logger.info("read < %s" % line)
-                    self.dispatch(line)
-            except UnicodeDecodeError:
-                logger.warn('Cannot decode incoming string')
-            except socket.error:
-                logger.exception('Socket error.')
-                raise LostConnectionException()
-
-    def msg(self, msg):
-        logger.info("sending > %s" % msg)
-        msg = "%s\r\n" % msg
-        self.irc.send(msg.encode(self.config["encoding"]))
+    def cmd(self, msg):
+        msg = ' '.join(chain(
+            map(lambda s: str(s).replace(' ', ''), msg[:-1]),
+            [(':%s' if ' ' in str(msg[-1]) else '%s') % str(msg[-1])]
+        ))
+        logger.info('sending > %s' % msg)
+        msg = '%s\r\n' % msg
+        self.push(bytearray(msg.encode(self.encoding, 'replace')))
 
     def say(self, target, msg):
-        self.msg("PRIVMSG %s :%s" % (target, msg))
+        self.cmd(['PRIVMSG', target, msg])
 
     def handle_kick(self, params):
         pass
 
     def handle_ping(self, params):
-        self.msg("PONG :%s" % params)
+        self.cmd(['PONG', params])
 
     def handle_privmsg(self, sender, target, params):
         pass
 
     def handle_cmd(self, sender, cmd, params):
-        if cmd == "NOTICE" and not self.connected:
+        if cmd == 'NOTICE' and not self.connected:
             self.connected = True
 
     def quit(self):
-        self.msg("QUIT")
+        self.cmd(['QUIT'])
         self.close()
 
     def close(self):

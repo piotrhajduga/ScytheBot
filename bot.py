@@ -1,11 +1,12 @@
-import logging
 import irc
+import logging
 import pkgutil
 import re
-import time
 import sqlite3
+import time
 from contextlib import contextmanager
-from threading import Timer, Thread
+from os.path import expanduser, expandvars
+from threading import Thread, Timer
 
 logger = logging.getLogger(__name__)
 
@@ -85,10 +86,9 @@ class Module(object):
     rule = None
 
     def __init__(self, bot, config):
-        self.config = config
-        self.config["threadable"] = config.get("thredeable", False)
-        if self.config["threadable"]:
-            self.config["thread_timeout"] = config.get("thread_timeout", 5.0)
+        self.threadable = config.get("thredeable", False)
+        if self.threadable:
+            self.thread_timeout = config.get("thread_timeout", 5.0)
 
     def run(self, bot, params):
         pass
@@ -97,29 +97,29 @@ class Module(object):
         pass
 
 
-class Bot(irc.IRC):
-    modules = dict()  # { "type" : ("pack_name", "regexp", "module") }
+class Bot(object):
+    _modules = dict()  # { "type" : ("pack_name", "regexp", "module") }
 
     def __init__(self, config):
-        irc.IRC.__init__(self, config)
-        from os.path import expanduser, expandvars
-        self.config["modules_paths"] = [expanduser(expandvars(path))
-                                        for path in config.modules_paths]
-        self.config["modules_database_path"] = expanduser(
+        self.irc = irc.IRC(config.host, config.port, config.nick,
+                           config.realname, config.password,
+                           config.ssl, config.encoding)
+        self.modules_paths = [expanduser(expandvars(path)) for path in config.modules_paths]
+        self.modules_database_path = expanduser(
             expandvars(config.modules_database_path))
         logger.debug('Modules database path = %s',
                      self.config["modules_database_path"])
-        self.config["load_modules"] = config.load_modules
-        self.config["block_modules"] = config.block_modules
-        self.config["channels"] = config.channels
-        self.modules["privmsg"] = list()
-        self.modules["cmd"] = list()
-        self.modules["kick"] = list()
+        self._load_modules = config.load_modules
+        self._block_modules = config.block_modules
+        self.channels = config.channels
+        self._modules["privmsg"] = list()
+        self._modules["cmd"] = list()
+        self._modules["kick"] = list()
         self.load_modules()
 
     @contextmanager
     def get_db(self):
-        db = sqlite3.connect(self.config["modules_database_path"])
+        db = sqlite3.connect(self.modules_database_path)
         yield db
         db.commit()
         db.close()
@@ -129,11 +129,11 @@ class Bot(irc.IRC):
 
     def load_modules(self):
         logger.debug('Loading modules from directories:\n%s',
-                     self.config["modules_paths"])
-        paths = self.config["modules_paths"]
+                     self.modules_paths)
+        paths = self.modules_paths
         modules = {
-            'load': self.config["load_modules"],
-            'block': self.config['block_modules'],
+            'load': self._load_modules,
+            'block': self._block_modules,
         }
         for (importer, name, _) in pkgutil.iter_modules(paths):
             logger.debug('Checking module: %s', name)
@@ -172,7 +172,7 @@ class Bot(irc.IRC):
 
     def load_module(self, pack_name, load_modules=None):
         modules = filter(lambda m: m[1] == pack_name,
-                         pkgutil.iter_modules(self.config["modules_paths"]))
+                         pkgutil.iter_modules(self.modules_paths))
         for (importer, name, _) in modules:
             try:
                 self.load_module_with_importer(importer, name,
@@ -233,8 +233,8 @@ class Bot(irc.IRC):
             obj.target = target
             obj.line = msg
             obj.match = match
-            if mdl[2].config['threadable']:
-                timeout = mdl[2].config['thread_timeout']
+            if mdl[2].threadable:
+                timeout = mdl[2].thread_timeout
                 run_in_background(timeout)(mdl[2].run)(obj, (sender, msg))
             else:
                 mdl[2].run(obj, (sender, msg))
