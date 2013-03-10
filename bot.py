@@ -123,8 +123,9 @@ class Bot(object):
             cfg['ssl'],
             cfg['encoding']
         )
-        self.irc.handlers['PRIVMSG'] = self.handle_privmsg,
-        self.irc.handlers['KICK'] = self.handle_kick,
+        self.irc.handlers['PRIVMSG'] = self.handle_privmsg
+        self.irc.handlers['NOTICE'] = self.handle_notice
+        self.irc.handlers['KICK'] = self.handle_kick
 
     def main(self):
         while True:
@@ -253,6 +254,15 @@ class Bot(object):
                 run_in_background(timeout)(mdl[2].run)(obj, (nick, msg))
             else:
                 mdl[2].run(obj, (nick, msg))
+
+    def handle_notice(self, _irc, prefix, command, params):
+        logger.debug('(prefix, command, params): %s)', (prefix, command, params))
+        if prefix == self.config['host'] and params[0] == self.config['nick']:
+            for chan in self.config['channels']:
+                self.irc.cmd(['JOIN', chan])
+
+    def say(self, target, msg):
+        self.irc.cmd(['PRIVMSG', target, msg])
 
     def set_config(self, conf):
         essentials = ('host', 'port', 'nick', 'realname')

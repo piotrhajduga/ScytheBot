@@ -3,7 +3,6 @@ import logging
 import re
 import socket
 import ssl
-from itertools import chain
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +35,7 @@ class IRC(asynchat.async_chat):
         self.nick = nick
         sock = IRC._init_socket(server, port, use_ssl)
         asynchat.async_chat.__init__(self, sock=sock)
-        self._authenticate(nick, realname, password)
+        self._authenticate(nick, realname, password, server)
         self.ibuffer = []
         self.set_terminator(b'\r\n')
         self.handlers = {
@@ -52,37 +51,40 @@ class IRC(asynchat.async_chat):
         logger.info('Connected to %s:%s', server, port)
         return sock
 
-    def _authenticate(self, nick, realname, password):
+    def _authenticate(self, nick, realname, password, server):
         if password:
             self.cmd(['PASS', password])
         self.cmd(['NICK', nick])
-        self.cmd(['USER', nick, 0, '*', realname])
+        self.cmd(['USER', nick, nick, server, realname])
 
     def collect_incoming_data(self, data):
         self.ibuffer.append(data)
 
     def found_terminator(self):
         def irc_split(s):
+            logger.info('recv < %s' % s)
             (prefix, command, params) = re.match(r"""(:[^ ]* |)([a-zA-Z]+|[0-9]{3})(.*)""", s).groups()
             if len(prefix) > 0:
                 prefix = prefix[1:-1]  # deleting ':' from the front and ' ' from the end
+            command = command.strip()
             command = IRC.reply_names.get(command, command)
             params = params.split(' :')  # for the last parameter, the only one that can contain spaces
             params = params[0].split(' ')[1:] + [' :'.join(params[1:])]
             return (prefix, command, params)
         (prefix, command, params) = irc_split(b''.join(self.ibuffer).decode(self.encoding, 'replace'))
+        #logger.debug('(prefix, command, params): %s)', (prefix, command, params))
         self.handlers.get(command, IRC.unhandled_reply_warning)(self, prefix, command, params)
         self.ibuffer = []
 
     def unhandled_reply_warning(self, prefix, command, params):
-        logger.debug('unhandled: %s %s %s', prefix, command, params)
+        pass
 
     def cmd(self, msg):
-        msg = ' '.join(chain(
-            map(lambda s: str(s).replace(' ', ''), msg[:-1]),
-            [(':%s' if ' ' in str(msg[-1]) else '%s') % str(msg[-1])]
-        ))
-        logger.info('sending > %s' % msg)
+        msg = (' :' if ' ' in str(msg[-1]) else ' ').join([
+            ' '.join(map(lambda s: str(s).replace(' ', ''), msg[:-1])),
+            str(msg[-1])
+        ])
+        logger.info('send > %s' % msg)
         msg = '%s\r\n' % msg
         self.push(bytearray(msg.encode(self.encoding, 'replace')))
 
@@ -90,7 +92,7 @@ class IRC(asynchat.async_chat):
         self.cmd(['PRIVMSG', target, msg])
 
     def handle_ping(self, prefix, command, params):
-        self.cmd(['PONG', params])
+        self.cmd(['PONG', params[0]])
 
     def quit(self):
         self.cmd(['QUIT'])
