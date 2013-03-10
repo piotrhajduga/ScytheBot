@@ -88,9 +88,6 @@ class IRC(asynchat.async_chat):
         msg = '%s\r\n' % msg
         self.push(bytearray(msg.encode(self.encoding, 'replace')))
 
-    def say(self, target, msg):
-        self.cmd(['PRIVMSG', target, msg])
-
     def handle_ping(self, prefix, command, params):
         self.cmd(['PONG', params[0]])
 
