@@ -86,22 +86,17 @@ class Bot(object):
         self.irc = None
 
     def handle_privmsg(self, _irc, prefix, command, params):
+        sender = prefix
         nick = prefix.split('!', 1)[0]
-        msg = params[-1]
+        msg = str(params[-1])
         channel = params[0]
-        if not msg:
-            return
-        dont_do = list()
         for mdl in self.modules["privmsg"]:
-            if mdl in dont_do:
-                return
-            dont_do.append(mdl)
             match = mdl[1].match(msg)
             if match is None:
                 continue
             logger.debug("Matching module: %s" % mdl[2].__class__)
             obj = WrappedBot(self)
-            obj.sender = nick
+            obj.sender = sender
             obj.target = channel
             obj.line = msg
             obj.match = match
@@ -144,6 +139,9 @@ class Bot(object):
                     'errno': exc.errno,
                     'strerror': exc.strerror,
                 })
+            except KeyboardInterrupt as exc:
+                self.close()
+                raise exc
             time.sleep(4)
 
     @contextmanager
@@ -155,7 +153,7 @@ class Bot(object):
 
     def close(self):
         if self.irc is not None:
-            self.irc.close()
+            self.irc.quit()
 
     def load_modules(self):
         logger.debug('Loading modules from directories:\n%s',

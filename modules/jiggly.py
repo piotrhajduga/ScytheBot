@@ -53,9 +53,7 @@ class RememberSong(Module):
         create_tables(bot)
 
     def run(self, bot, params):
-        with bot.get_db() as db:
-            authorised = is_authorised(db, bot.sender)
-        if not authorised:
+        if not is_authorised(bot):
             logger.warn("Unauthorized attempt to teach a lyric")
             return
         query = 'INSERT INTO sing (lyric) VALUES (?)'

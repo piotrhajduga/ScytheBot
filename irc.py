@@ -80,20 +80,16 @@ class IRC(asynchat.async_chat):
         pass
 
     def cmd(self, msg):
-        msg = ' :'.join([
-            ' '.join(map(lambda s: str(s).replace(' ', ''), msg[:-1])),
-            str(msg[-1])
-        ])
-        logger.info('send > %s' % msg)
-        msg = '%s\r\n' % msg
-        self.push(bytearray(msg.encode(self.encoding, 'replace')))
+        msg_str = '%s :%s' % (
+            ' '.join([str(s).replace(' ', '') for s in msg[:-1]]),
+            msg[-1]
+        )
+        logger.info('send > %s' % msg_str)
+        msg_str = '%s\r\n' % msg_str
+        self.push(bytearray(msg_str.encode(self.encoding, 'replace')))
 
     def handle_ping(self, prefix, command, params):
         self.cmd(['PONG', params[0]])
 
     def quit(self):
         self.cmd(['QUIT'])
-        self.close()
-
-    def close(self):
-        pass

@@ -11,6 +11,7 @@ __module_class_names__ = [
 
 import hashlib
 import logging
+import sqlite3
 from bot import Module
 from contextlib import closing
 
@@ -27,11 +28,12 @@ def create_tables(bot):
         db.execute(query)
 
 
-def is_authorised(db, sender):
+def is_authorised(bot):
     query = 'SELECT * FROM admins WHERE sender=?'
-    with closing(db.cursor()) as cur:
-        cur.execute(query, (sender,))
-        return cur.rowcount
+    with bot.get_db() as db:
+        with closing(db.cursor()) as cur:
+            cur.execute(query, (bot.sender,))
+            return len(cur.fetchall())
 
 
 class Autojoin(Module):
@@ -53,8 +55,7 @@ class Auth(Module):
         create_tables(bot)
 
     def run(self, bot, params):
-        with bot.get_db() as db:
-            authorised = is_authorised(db, bot.sender)
+        authorised = is_authorised(bot)
         if authorised:
             bot.say(bot.sender.split("!")[0], "You already are authorized.")
             return
@@ -64,7 +65,7 @@ class Auth(Module):
         query = 'UPDATE admins SET sender=? WHERE nick=? AND pass=?'
         with bot.get_db() as db:
             db.execute(query, (bot.sender, username, password))
-        if authorised:
+        if is_authorised(bot):
             bot.say(bot.sender.split("!")[0], "Succesfully authorized.")
         else:
             bot.say(bot.sender.split("!")[0], "Unable to authorize.")
@@ -77,20 +78,19 @@ class Deauth(Module):
         self.rule = r"^\.deauth$"
 
     def run(self, bot, params):
-        with bot.get_db() as db:
-            authorised = is_authorised(db, bot.sender)
+        authorised = is_authorised(bot)
         if not authorised:
             bot.say(bot.sender.split("!")[0], "You are not authorized.")
             return
-        query = 'UPDATE admins SET sender="" WHERE sender=?'
         with bot.get_db() as db:
-            cur = db.cursor()
-            cur.execute(query, (bot.sender,))
-        if cur.rowcount:
-            bot.say(bot.sender.split("!")[0], "Succesfully deauthorized.")
-        else:
+            db.row_factory = sqlite3.Row
+            with closing(db.cursor()) as cur:
+                query = 'UPDATE admins SET sender="" WHERE sender=?'
+                cur.execute(query, (bot.sender,))
+        if is_authorised(bot):
             bot.say(bot.sender.split("!")[0], "Unable to deauthorize.")
-        cur.close()
+        else:
+            bot.say(bot.sender.split("!")[0], "Succesfully deauthorized.")
 
 
 class Join(Module):
@@ -100,8 +100,7 @@ class Join(Module):
         self.rule = r"\.join (\#[^ ]+)"
 
     def run(self, bot, params):
-        with bot.get_db() as db:
-            authorised = is_authorised(db, bot.sender)
+        authorised = is_authorised(bot)
         if not authorised:
             bot.say(bot.sender.split("!")[0], "You are not authorized.")
             return
@@ -116,8 +115,7 @@ class Part(Module):
         self.rule = r"\.part (\#[^ ]+)"
 
     def run(self, bot, params):
-        with bot.get_db() as db:
-            authorised = is_authorised(db, bot.sender)
+        authorised = is_authorised(bot)
         if not authorised:
             bot.say(bot.sender.split("!")[0], "You are not authorized.")
             return
@@ -131,8 +129,7 @@ class Nick(Module):
         self.rule = r"\.nick ([^ ]+)"
 
     def run(self, bot, params):
-        with bot.get_db() as db:
-            authorised = is_authorised(db, bot.sender)
+        authorised = is_authorised(bot)
         if not authorised:
             bot.say(bot.sender.split("!")[0], "You are not authorized.")
             return
@@ -147,8 +144,7 @@ class Msg(Module):
         self.rule = r"\.msg (\#[^ ]+)[ ]+([^ ].*)"
 
     def run(self, bot, params):
-        with bot.get_db() as db:
-            authorised = is_authorised(db, bot.sender)
+        authorised = is_authorised(bot)
         if not authorised:
             bot.say(bot.sender.split("!")[0], "You are not authorized.")
             return
@@ -162,8 +158,7 @@ class Send(Module):
         self.rule = r"\.send[ ]+([^ ].*)"
 
     def run(self, bot, params):
-        with bot.get_db() as db:
-            authorised = is_authorised(db, bot.sender)
+        authorised = is_authorised(bot)
         if not authorised:
             bot.say(bot.sender.split("!")[0], "You are not authorized.")
             return
@@ -177,8 +172,7 @@ class Reload(Module):
         self.rule = r"^\.(reload|unload)[ ]+([^ ]+)$"
 
     def run(self, bot, params):
-        with bot.get_db() as db:
-            authorised = is_authorised(db, bot.sender)
+        authorised = is_authorised(bot)
         if not authorised:
             bot.say(bot.sender.split("!")[0], "You are not authorized.")
             return
@@ -186,20 +180,18 @@ class Reload(Module):
         nick = params[0].split("!")[0]
         try:
             bot.unload_module(mn)
-        except Exception as exc:
+            bot.say(nick, "Unloading of module %s SUCCESSFUL!" % mn)
+        except BaseException as exc:
             logger.exception(str(exc))
             bot.say(nick, "Unloading of module %s FAILED!" % mn)
-        else:
-            bot.say(nick, "Unloading of module %s SUCCESSFUL!" % mn)
         if bot.match.groups()[0] == 'unload':
             return
         try:
             bot.load_module(mn)
-        except Exception as exc:
+            bot.say(nick, "Reloading of module %s SUCCESSFUL!" % mn)
+        except BaseException as exc:
             logger.exception(str(exc))
             bot.say(nick, "Reloading of module %s FAILED!" % mn)
-        else:
-            bot.say(nick, "Reloading of module %s SUCCESSFUL!" % mn)
 
 
 class CoreDump(Module):
@@ -209,8 +201,7 @@ class CoreDump(Module):
         self.rule = r"^\.core_dump$"
 
     def run(self, bot, params):
-        with bot.get_db() as db:
-            authorised = is_authorised(db, bot.sender)
+        authorised = is_authorised(bot)
         if not authorised:
             bot.say(bot.sender.split("!")[0], "You are not authorized.")
             return
