@@ -24,25 +24,11 @@ if __name__ == '__main__':
     logger.debug('Modules paths: %s', config.modules_paths)
 
     ircbot = bot.Bot(config)
-    while 1:
-        try:
-            ircbot.connect()
-            ircbot.main_loop()
-        except KeyboardInterrupt as exc:
-            ircbot.quit()
-            sys.exit()
-        except irc.LostConnectionException as exc:
-            logger.error('Lost connection with the irc network')
-            ircbot.close()
-            try:
-                time.sleep(config.cooldown)
-            except NameError:
-                time.sleep(5)
-            continue
-        except irc.ConnectionFailureException as exc:
-            logger.error('Cannot connect to the irc network')
-            sys.exit()
-        except Exception as exc:
-            traceback.print_exc()
-            ircbot.close()
-            sys.exit()
+    try:
+        ircbot.main()
+    except KeyboardInterrupt as exc:
+        pass
+    except Exception as exc:
+        traceback.print_exc()
+    finally:
+        ircbot.close()

@@ -5,3 +5,4 @@ py*/
 *.sqlite
 *.sqlite3
 tags
+config.py

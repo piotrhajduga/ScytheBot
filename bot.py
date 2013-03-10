@@ -1,11 +1,12 @@
+import asyncore
 import irc
 import logging
 import pkgutil
 import re
+import socket
 import sqlite3
 import time
 from contextlib import contextmanager
-from os.path import expanduser, expandvars
 from threading import Thread, Timer
 
 logger = logging.getLogger(__name__)
@@ -83,12 +84,12 @@ def run_in_background(timeout=None):
 
 
 class Module(object):
-    rule = None
-
     def __init__(self, bot, config):
-        self.threadable = config.get("thredeable", False)
-        if self.threadable:
-            self.thread_timeout = config.get("thread_timeout", 5.0)
+        self.rule = None
+        self.config = {}
+        self.config['threadable'] = config.get("thredeable", False)
+        if self.config['threadable']:
+            self.config['thread_timeout'] = config.get("thread_timeout", 5.0)
 
     def run(self, bot, params):
         pass
@@ -98,42 +99,63 @@ class Module(object):
 
 
 class Bot(object):
-    _modules = dict()  # { "type" : ("pack_name", "regexp", "module") }
-
     def __init__(self, config):
-        self.irc = irc.IRC(config.host, config.port, config.nick,
-                           config.realname, config.password,
-                           config.ssl, config.encoding)
-        self.modules_paths = [expanduser(expandvars(path)) for path in config.modules_paths]
-        self.modules_database_path = expanduser(
-            expandvars(config.modules_database_path))
+        self.config = {}
+        self.set_config(config)
         logger.debug('Modules database path = %s',
-                     self.config["modules_database_path"])
-        self._load_modules = config.load_modules
-        self._block_modules = config.block_modules
-        self.channels = config.channels
-        self._modules["privmsg"] = list()
-        self._modules["cmd"] = list()
-        self._modules["kick"] = list()
+                     self.config['modules_database_path'])
+        self.modules = {
+            # 'type': [(pack_name, regexp, module)...]
+            'privmsg': [],
+            'kick': [],
+        }
         self.load_modules()
+        self.irc = None
+
+    def connect(self):
+        cfg = self.config
+        self.irc = irc.IRC(
+            cfg['host'],
+            cfg['port'],
+            cfg['nick'],
+            cfg['realname'],
+            cfg['password'],
+            cfg['ssl'],
+            cfg['encoding']
+        )
+        self.irc.handlers['PRIVMSG'] = self.handle_privmsg,
+        self.irc.handlers['KICK'] = self.handle_kick,
+
+    def main(self):
+        while True:
+            try:
+                self.connect()
+                asyncore.loop()
+            except socket.error as exc:
+                logger.error('Problem connecting: %(errno)s: %(strerror)s' % {
+                    'errno': exc.errno,
+                    'strerror': exc.strerror,
+                })
+            time.sleep(4)
 
     @contextmanager
     def get_db(self):
-        db = sqlite3.connect(self.modules_database_path)
+        db = sqlite3.connect(self.config['modules_database_path'])
         yield db
         db.commit()
         db.close()
 
     def close(self):
-        irc.IRC.close(self)
+        if self.irc is not None:
+            self.irc.close()
 
     def load_modules(self):
         logger.debug('Loading modules from directories:\n%s',
-                     self.modules_paths)
-        paths = self.modules_paths
+                     self.config['modules_paths'])
+        paths = self.config['modules_paths']
         modules = {
-            'load': self._load_modules,
-            'block': self._block_modules,
+            'load': self.config['load_modules'],
+            'block': self.config['block_modules'],
         }
         for (importer, name, _) in pkgutil.iter_modules(paths):
             logger.debug('Checking module: %s', name)
@@ -203,20 +225,13 @@ class Bot(object):
                 prepared[key] = config[key][0]
         return prepared
 
-    def handle_cmd(self, sender, cmd, params):
-        for mdl in self.modules["cmd"]:
-            match = mdl[1].match("%s :%s" % (cmd, params))
-            if match is None:
-                continue
-            logger.debug("Matching module: %s" % mdl[2].__class__)
-            obj = WrappedBot(self)
-            obj.sender = sender
-            obj.cmd = cmd
-            obj.params = params
-            obj.match = match
-            mdl[2].run(obj, (cmd, params))
+    def handle_kick(self, _irc, prefix, command, params):
+        pass
 
-    def handle_privmsg(self, sender, target, msg):
+    def handle_privmsg(self, _irc, prefix, command, params):
+        nick = prefix.split('!', 1)[0]
+        msg = params[-1]
+        channel = params[0]
         if not msg:
             return
         dont_do = list()
@@ -229,12 +244,33 @@ class Bot(object):
                 continue
             logger.debug("Matching module: %s" % mdl[2].__class__)
             obj = WrappedBot(self)
-            obj.sender = sender
-            obj.target = target
+            obj.sender = nick
+            obj.target = channel
             obj.line = msg
             obj.match = match
-            if mdl[2].threadable:
-                timeout = mdl[2].thread_timeout
-                run_in_background(timeout)(mdl[2].run)(obj, (sender, msg))
+            if mdl[2].config['threadable']:
+                timeout = mdl[2].config['thread_timeout']
+                run_in_background(timeout)(mdl[2].run)(obj, (nick, msg))
             else:
-                mdl[2].run(obj, (sender, msg))
+                mdl[2].run(obj, (nick, msg))
+
+    def set_config(self, conf):
+        essentials = ('host', 'port', 'nick', 'realname')
+        defaults = {
+            'password': None,
+            'ssl': False,
+            'encoding': 'utf8',
+            'modules_paths': ['/modules'],
+            'modules_database_path': '.db_modules.sqlite3',
+            'load_modules': [],
+            'block_modules': [],
+            'channels': [],
+        }
+        try:
+            for key in essentials:
+                self.config[key] = getattr(conf, key)
+        except AttributeError as exc:
+            logger.error('Missing or incorrect configuration: %s', str(exc))
+            raise exc
+        for key, value in defaults.items():
+            self.config[key] = getattr(conf, key, value)

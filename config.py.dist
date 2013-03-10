@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 password = None
 nick = "scythebot"
-ident = "scythebot"
-name = "scythebot pythonic IRC bot in development"
+realname = "scythebot pythonic IRC bot in development"
 nickserv_passwd = None
 host = "host"
 port = 6667
